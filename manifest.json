@@ -1,0 +1,209 @@
+{
+  "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
+  "manifest_version": 1,
+  "id": "com.nintycat.shell",
+  "name": "Shell",
+  "version": "0.5.0",
+  "publisher": "nintycat",
+  "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
+  "icon": "assets/plugin.svg",
+  "engines": {
+    "dbx": ">=0.5.68",
+    "host_api": "1"
+  },
+  "permissions": ["host.events", "host.filesystem"],
+  "entrypoints": {
+    "backend": {
+      "executable": "bin/dbx-plugin-nintyshell"
+    },
+    "ui": {
+      "root": "ui",
+      "entry": "ui/index.html"
+    }
+  },
+  "contributions": [
+    {
+      "type": "connection-provider",
+      "id": "com.nintycat.shell.connection",
+      "label": "Local Shell",
+      "icon": "assets/plugin.svg",
+      "database_type": "shell",
+      "description": "A local shell session for running commands.",
+      "fields": [
+        {
+          "key": "display_name",
+          "label": "Connection name",
+          "type": "text",
+          "default": "Local Shell",
+          "binding": "name",
+          "required": true
+        },
+        {
+          "key": "shell_path",
+          "label": "Shell path",
+          "type": "text",
+          "default": "/bin/zsh",
+          "placeholder": "/bin/zsh",
+          "description": "Executable used to run commands (bash/zsh/sh).",
+          "binding": "config"
+        },
+        {
+          "key": "working_dir",
+          "label": "Working directory",
+          "type": "text",
+          "default": "",
+          "placeholder": "~",
+          "description": "Initial directory for the session. Empty means the home directory.",
+          "binding": "config"
+        }
+      ],
+      "workbench": "com.nintycat.shell.workbench",
+      "capabilities": ["test", "connect", "disconnect"]
+    },
+    {
+      "type": "connection-provider",
+      "id": "com.nintycat.ssh.connection",
+      "label": "SSH / SFTP",
+      "icon": "assets/plugin.svg",
+      "database_type": "ssh",
+      "description": "Remote shell terminal and SFTP file manager over SSH.",
+      "fields": [
+        {
+          "key": "display_name",
+          "label": "Connection name",
+          "type": "text",
+          "default": "SSH Server",
+          "binding": "name",
+          "required": true
+        },
+        {
+          "key": "host",
+          "label": "Host",
+          "type": "text",
+          "placeholder": "192.168.1.10",
+          "binding": "host",
+          "required": true
+        },
+        {
+          "key": "port",
+          "label": "Port",
+          "type": "number",
+          "default": 22,
+          "binding": "port"
+        },
+        {
+          "key": "username",
+          "label": "Username",
+          "type": "text",
+          "placeholder": "root",
+          "binding": "username",
+          "required": true
+        },
+        {
+          "key": "auth_type",
+          "label": "Authentication",
+          "type": "select",
+          "default": "password",
+          "binding": "config",
+          "options": [
+            { "label": "Password", "value": "password" },
+            { "label": "Private key", "value": "private_key" }
+          ]
+        },
+        {
+          "key": "password",
+          "label": "Password",
+          "type": "password",
+          "binding": "secret",
+          "visible_when": { "field": "auth_type", "one_of": ["password"] }
+        },
+        {
+          "key": "key_path",
+          "label": "Private key path",
+          "type": "text",
+          "placeholder": "~/.ssh/id_ed25519",
+          "description": "Local path of the private key file.",
+          "binding": "config",
+          "picker": { "kind": "file", "accept": [".pem", ".key", ".rsa", ".ed25519", ".ecdsa"] },
+          "visible_when": { "field": "auth_type", "one_of": ["private_key"] }
+        },
+        {
+          "key": "key_passphrase",
+          "label": "Key passphrase",
+          "type": "password",
+          "binding": "secret",
+          "visible_when": { "field": "auth_type", "one_of": ["private_key"] }
+        }
+      ],
+      "workbench": "com.nintycat.shell.workbench",
+      "filesystem_provider": "com.nintycat.shell.fs",
+      "capabilities": ["test", "connect", "disconnect"]
+    },
+    {
+      "type": "workbench",
+      "id": "com.nintycat.shell.workbench",
+      "label": "Shell terminal",
+      "description": "Terminal and file manager UI for shell connections.",
+      "icon": "assets/plugin.svg"
+    },
+    {
+      "type": "filesystem-provider",
+      "id": "com.nintycat.shell.fs",
+      "label": "SFTP files",
+      "icon": "assets/plugin.svg",
+      "schemes": ["sftp"],
+      "root_uri": "sftp:///",
+      "capabilities": ["read", "write", "delete", "rename", "mkdir"]
+    }
+  ],
+  "localizations": {
+    "zh-CN": {
+      "name": "Shell",
+      "description": "在 DBX 工作台中打开本地 Shell 与 SSH/SFTP 终端，执行命令并管理远程文件。",
+      "contributions": {
+        "com.nintycat.shell.connection": {
+          "label": "本地 Shell",
+          "description": "本地 Shell 会话，可执行任意命令。",
+          "fields": {
+            "display_name": { "label": "连接名称" },
+            "shell_path": {
+              "label": "Shell 路径",
+              "description": "用于执行命令的 Shell 可执行文件（bash/zsh/sh）。",
+              "placeholder": "/bin/zsh"
+            },
+            "working_dir": {
+              "label": "初始目录",
+              "description": "会话的初始工作目录，留空则使用家目录。",
+              "placeholder": "~"
+            }
+          }
+        },
+        "com.nintycat.ssh.connection": {
+          "label": "SSH / SFTP 连接",
+          "description": "通过 SSH 打开远程终端与 SFTP 文件管理。",
+          "fields": {
+            "display_name": { "label": "连接名称" },
+            "host": { "label": "主机", "placeholder": "192.168.1.10" },
+            "port": { "label": "端口" },
+            "username": { "label": "用户名", "placeholder": "root" },
+            "auth_type": { "label": "认证方式" },
+            "password": { "label": "密码" },
+            "key_path": {
+              "label": "私钥路径",
+              "description": "本地私钥文件路径。",
+              "placeholder": "~/.ssh/id_ed25519"
+            },
+            "key_passphrase": { "label": "私钥口令" }
+          }
+        },
+        "com.nintycat.shell.workbench": {
+          "label": "Shell 终端",
+          "description": "Shell 连接的终端与文件工作台。"
+        },
+        "com.nintycat.shell.fs": {
+          "label": "SFTP 文件"
+        }
+      }
+    }
+  }
+}
