@@ -4,8 +4,8 @@
   "icon": "assets/plugin.svg",
   "tags": ["terminal", "ssh", "sftp", "shell"],
   "permissions": ["host.events", "host.filesystem"],
-  "source": "https://github.com/NintyCat/nintyshell",
-  "homepage": "https://github.com/NintyCat/nintyshell",
+  "source": "https://github.com/NintyCat/dbx-plugin-NintyShell",
+  "homepage": "https://github.com/NintyCat/dbx-plugin-NintyShell",
   "license": "MIT",
   "releaseNotes": "Windows support for the Local Shell connection (auto-selected powershell.exe, command wrapper with exit-code and working-directory reporting) and platform-aware shell defaults; panic log moved from /tmp to the user cache directory with tightened permissions; collapsible activity log in the file panel.",
   "localizations": {

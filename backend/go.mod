@@ -1,4 +1,4 @@
-module github.com/nintycat/nintyshell
+module github.com/NintyCat/dbx-plugin-NintyShell
 
 go 1.22
 
