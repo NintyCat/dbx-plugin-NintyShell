@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "com.nintycat.shell",
   "name": "Shell",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "publisher": "nintycat",
   "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
   "icon": "assets/plugin.svg",
@@ -42,9 +42,7 @@
           "key": "shell_path",
           "label": "Shell path",
           "type": "text",
-          "default": "/bin/zsh",
-          "placeholder": "/bin/zsh",
-          "description": "Executable used to run commands (bash/zsh/sh).",
+          "description": "Executable used to run commands. Leave empty to auto-select: powershell.exe on Windows, /bin/zsh on macOS, /bin/bash on Linux.",
           "binding": "config"
         },
         {
@@ -168,8 +166,7 @@
             "display_name": { "label": "连接名称" },
             "shell_path": {
               "label": "Shell 路径",
-              "description": "用于执行命令的 Shell 可执行文件（bash/zsh/sh）。",
-              "placeholder": "/bin/zsh"
+              "description": "用于执行命令的 Shell 可执行文件。留空自动选择：Windows 使用 powershell.exe，macOS 使用 /bin/zsh，Linux 使用 /bin/bash。"
             },
             "working_dir": {
               "label": "初始目录",

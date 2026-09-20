@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,12 +13,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -26,7 +29,6 @@ import (
 )
 
 const (
-	defaultShell        = "/bin/zsh"
 	metaTag             = "__DBX_META__"
 	maxOutputBytes      = 4 * 1024 * 1024
 	maxPtyOutputBytes   = 1 << 30
@@ -41,6 +43,20 @@ const (
 	providerLocal       = "com.nintycat.shell.connection"
 	providerSSH         = "com.nintycat.ssh.connection"
 )
+
+// defaultShellPath picks the shell used when the connection form leaves the
+// path empty, so every platform works out of the box (review finding: the
+// previous constant /bin/zsh broke the Windows local shell).
+func defaultShellPath() string {
+	switch runtime.GOOS {
+	case "windows":
+		return "powershell.exe"
+	case "darwin":
+		return "/bin/zsh"
+	default:
+		return "/bin/bash"
+	}
+}
 
 // metaStatement is appended to every local command. The child shell reports the
 // command's exit code and the resulting working directory on fd 3, a pipe that
@@ -111,13 +127,26 @@ func (s *shellSession) deadError() string {
 }
 
 // guardPanic recovers panics in background goroutines and dumps the trace to
-// a file, because the dev host swallows sidecar stderr.
+// a file, because the dev host swallows sidecar stderr. The log lives under
+// the user's cache dir (or DBX_PLUGIN_DATA_DIR when the host provides one),
+// not a world-readable /tmp file.
 func guardPanic(where string) {
 	if r := recover(); r != nil {
 		message := fmt.Sprintf("[%s] panic: %v\n%s\n", where, r, debug.Stack())
-		_ = os.WriteFile("/tmp/nintyshell-panic.log", []byte(message), 0o644)
+		_ = os.MkdirAll(filepath.Dir(panicLogPath()), 0o700)
+		_ = os.WriteFile(panicLogPath(), []byte(message), 0o600)
 		log.Printf("panic in %s: %v", where, r)
 	}
+}
+
+func panicLogPath() string {
+	if dir := strings.TrimSpace(os.Getenv("DBX_PLUGIN_DATA_DIR")); dir != "" {
+		return filepath.Join(dir, "panic.log")
+	}
+	if cache, err := os.UserCacheDir(); err == nil {
+		return filepath.Join(cache, "com.nintycat.shell", "panic.log")
+	}
+	return filepath.Join(os.TempDir(), "nintyshell-panic.log")
 }
 
 // withTimeout bounds a network call so a dead connection fails fast instead of
@@ -473,9 +502,37 @@ func (p *plugin) workingDir(values map[string]any) (any, *dbxpluginsdk.PluginErr
 
 type runningCommand struct {
 	*exec.Cmd
-	metaReader *os.File
+	metaReader *os.File // POSIX fd-3 metadata pipe (unix)
+	metaPath   string   // PowerShell metadata temp file (windows)
 	stdout     *streamWriter
 	stderr     *streamWriter
+}
+
+// shellStyleFor decides how a local command is invoked. Windows needs
+// per-invocation handling: cmd.exe takes /C, PowerShell takes
+// -EncodedCommand, and POSIX shells (git bash / MSYS) take -c. On unix
+// everything speaks `-c` plus the fd-3 meta statement.
+type shellStyle int
+
+const (
+	posixShell shellStyle = iota
+	powershellShell
+	cmdShell
+)
+
+func shellStyleFor(shellPath string) shellStyle {
+	if runtime.GOOS != "windows" {
+		return posixShell
+	}
+	base := strings.TrimSuffix(strings.ToLower(filepath.Base(shellPath)), ".exe")
+	switch {
+	case strings.Contains(base, "powershell") || base == "pwsh":
+		return powershellShell
+	case base == "cmd":
+		return cmdShell
+	default:
+		return posixShell
+	}
 }
 
 func (s *shellSession) startLocalExec(command string, emitter *dbxpluginsdk.Emitter) (*execRun, error) {
@@ -494,7 +551,9 @@ func (s *shellSession) startLocalExec(command string, emitter *dbxpluginsdk.Emit
 	}
 	stdout, stderr := cmd.stdout, cmd.stderr
 	metaLines := make(chan string, 4)
-	go readMeta(cmd.metaReader, metaLines)
+	if cmd.metaReader != nil {
+		go readMeta(cmd.metaReader, metaLines)
+	}
 	done := make(chan struct{})
 	sessionID := s.id
 
@@ -503,15 +562,23 @@ func (s *shellSession) startLocalExec(command string, emitter *dbxpluginsdk.Emit
 		defer guardPanic("wait-local")
 		defer close(done)
 		waitErr := cmd.Cmd.Wait()
-		meta := ""
-		select {
-		case meta = <-metaLines:
-		case <-time.After(metaReadGracePeriod):
-		}
-		metaReader := cmd.metaReader
-		metaReader.Close()
 
-		exitCode, metaCwd, hasMeta := parseMetaLine(meta)
+		exitCode, metaCwd, hasMeta := 0, "", false
+		switch {
+		case cmd.metaReader != nil:
+			meta := ""
+			select {
+			case meta = <-metaLines:
+			case <-time.After(metaReadGracePeriod):
+			}
+			cmd.metaReader.Close()
+			exitCode, metaCwd, hasMeta = parseMetaLine(meta)
+		case cmd.metaPath != "":
+			if value := readMetaFile(cmd.metaPath); value != "" {
+				exitCode, metaCwd, hasMeta = parseMetaFileValue(value)
+			}
+			os.Remove(cmd.metaPath)
+		}
 		if !hasMeta {
 			exitCode = exitStatus(waitErr)
 		}
@@ -533,7 +600,8 @@ func (s *shellSession) startLocalExec(command string, emitter *dbxpluginsdk.Emit
 }
 
 func startCommand(shellPath, command, dir string, emitter *dbxpluginsdk.Emitter, sessionID string) (*runningCommand, error) {
-	cmd := exec.Command(shellPath, "-c", command+"\n"+metaStatement)
+	style := shellStyleFor(shellPath)
+	cmd := exec.Command(shellPath)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	configureProcessGroup(cmd)
@@ -543,19 +611,90 @@ func startCommand(shellPath, command, dir string, emitter *dbxpluginsdk.Emitter,
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
-	metaReader, metaWriter, err := os.Pipe()
-	if err != nil {
-		return nil, err
+	rc := &runningCommand{Cmd: cmd, stdout: stdout, stderr: stderr}
+	var metaWriter *os.File
+	cleanup := func() {
+		if metaWriter != nil {
+			metaWriter.Close()
+		}
+		if rc.metaReader != nil {
+			rc.metaReader.Close()
+		}
+		if rc.metaPath != "" {
+			os.Remove(rc.metaPath)
+		}
 	}
-	cmd.ExtraFiles = []*os.File{metaWriter}
+
+	switch {
+	case style == powershellShell:
+		// fd 3 does not exist on Windows, so the wrapper reports the exit
+		// code and resulting directory through a temp file instead.
+		metaFile, err := os.CreateTemp("", "dbx-shell-*.meta")
+		if err != nil {
+			return nil, err
+		}
+		metaPath := metaFile.Name()
+		metaFile.Close()
+		rc.metaPath = metaPath
+		cmd.Args = []string{shellPath, "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShellScript(powershellWrapper(command, metaPath))}
+	case style == cmdShell:
+		cmd.Args = []string{shellPath, "/C", command}
+	case runtime.GOOS == "windows":
+		// POSIX-style shell on Windows (git bash / MSYS): `-c` works, but
+		// ExtraFiles/fd 3 do not, so no meta reporting (exit code falls
+		// back to the process exit status and cwd stays fixed).
+		cmd.Args = []string{shellPath, "-c", command}
+	default:
+		cmd.Args = []string{shellPath, "-c", command + "\n" + metaStatement}
+		metaReader, writer, err := os.Pipe()
+		if err != nil {
+			return nil, err
+		}
+		rc.metaReader = metaReader
+		metaWriter = writer
+		cmd.ExtraFiles = []*os.File{metaWriter}
+	}
+
 	if err := cmd.Start(); err != nil {
-		metaWriter.Close()
-		metaReader.Close()
+		cleanup()
 		return nil, err
 	}
-	// Drop the parent's copy so the read end sees EOF once the child exits.
-	metaWriter.Close()
-	return &runningCommand{Cmd: cmd, metaReader: metaReader, stdout: stdout, stderr: stderr}, nil
+	if metaWriter != nil {
+		// Drop the parent's copy of the write end so the read end sees EOF
+		// once the child exits.
+		metaWriter.Close()
+	}
+	return rc, nil
+}
+
+// powershellWrapper runs the user command in a script block, then records
+// "<exit code>|<working directory>" into metaPath. Exit codes prefer the last
+// native command's $LASTEXITCODE and fall back to PowerShell's $? status for
+// cmdlet-only pipelines.
+func powershellWrapper(command, metaPath string) string {
+	return strings.Join([]string{
+		"$ErrorActionPreference = 'Continue'",
+		"& {",
+		command,
+		"}",
+		"$rc = 0",
+		"if (-not $?) { $rc = 1 }",
+		"if (($LASTEXITCODE -is [int]) -and ($LASTEXITCODE -ne 0)) { $rc = $LASTEXITCODE }",
+		"Set-Content -LiteralPath '" + strings.ReplaceAll(metaPath, "'", "''") + "' -Value (\"$rc|\" + (Get-Location).Path)",
+		"",
+	}, "\n")
+}
+
+// encodePowerShellScript encodes a script as base64 UTF-16LE, the format
+// PowerShell's -EncodedCommand expects; it avoids every quoting pitfall of
+// passing the user's command through the Windows command line.
+func encodePowerShellScript(script string) string {
+	encoded := utf16.Encode([]rune(script))
+	bytes := make([]byte, 0, len(encoded)*2)
+	for _, unit := range encoded {
+		bytes = append(bytes, byte(unit), byte(unit>>8))
+	}
+	return base64.StdEncoding.EncodeToString(bytes)
 }
 
 // ---- output streaming ----
@@ -612,6 +751,34 @@ func readMeta(file *os.File, lines chan<- string) {
 		if err != nil {
 			return
 		}
+	}
+}
+
+// parseMetaFileValue reads the PowerShell wrapper's "<exit code>|<cwd>" record.
+func parseMetaFileValue(raw string) (exitCode int, cwd string, ok bool) {
+	codePart, cwdPart, found := strings.Cut(raw, "|")
+	if !found {
+		return 0, "", false
+	}
+	code, err := strconv.Atoi(strings.TrimSpace(codePart))
+	if err != nil {
+		return 0, "", false
+	}
+	return code, strings.TrimSpace(cwdPart), true
+}
+
+// readMetaFile waits briefly for the PowerShell wrapper to write its metadata
+// record, tolerating scheduler delay between process exit and file flush.
+func readMetaFile(path string) string {
+	deadline := time.Now().Add(metaReadGracePeriod)
+	for {
+		if data, err := os.ReadFile(path); err == nil {
+			return strings.TrimSpace(string(data))
+		}
+		if time.Now().After(deadline) {
+			return ""
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -936,7 +1103,7 @@ func expandHome(path string) (string, bool) {
 func resolveShell(path string) (string, string) {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
-		trimmed = defaultShell
+		trimmed = defaultShellPath()
 	}
 	if expanded, ok := expandHome(trimmed); ok {
 		trimmed = expanded
@@ -985,7 +1152,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.5.0"
+	pluginVersion = "0.6.0"
 )
 
 func main() {

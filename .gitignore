@@ -1,5 +1,7 @@
-/dist/
-/.dbx-dev/
-.dbx-repository-signing-key.env
+dist/
+.dbx-dev/
+dbx-repository-signing-key.env
 .DS_Store
 *.log
+backend/nintyshell
+backend/nintyshell.exe
