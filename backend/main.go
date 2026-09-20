@@ -670,17 +670,26 @@ func startCommand(shellPath, command, dir string, emitter *dbxpluginsdk.Emitter,
 // powershellWrapper runs the user command in a script block, then records
 // "<exit code>|<working directory>" into metaPath. Exit codes prefer the last
 // native command's $LASTEXITCODE and fall back to PowerShell's $? status for
-// cmdlet-only pipelines.
+// cmdlet-only pipelines. The record is written with .NET's WriteAllText as
+// UTF-8 without a BOM: PS 5.1's Set-Content would use the ANSI codepage (and
+// mangle non-ASCII paths), while -Encoding UTF8 would prepend a BOM that
+// breaks exit-code parsing.
 func powershellWrapper(command, metaPath string) string {
+	escapedPath := strings.ReplaceAll(metaPath, "'", "''")
 	return strings.Join([]string{
 		"$ErrorActionPreference = 'Continue'",
+		"$rc = 0",
+		"try {",
 		"& {",
 		command,
 		"}",
-		"$rc = 0",
 		"if (-not $?) { $rc = 1 }",
 		"if (($LASTEXITCODE -is [int]) -and ($LASTEXITCODE -ne 0)) { $rc = $LASTEXITCODE }",
-		"Set-Content -LiteralPath '" + strings.ReplaceAll(metaPath, "'", "''") + "' -Value (\"$rc|\" + (Get-Location).Path)",
+		"} catch {",
+		"$rc = 1",
+		"Write-Error $_",
+		"}",
+		"[System.IO.File]::WriteAllText('" + escapedPath + "', \"$rc|\" + (Get-Location).Path, (New-Object System.Text.UTF8Encoding($false)))",
 		"",
 	}, "\n")
 }
@@ -768,12 +777,13 @@ func parseMetaFileValue(raw string) (exitCode int, cwd string, ok bool) {
 }
 
 // readMetaFile waits briefly for the PowerShell wrapper to write its metadata
-// record, tolerating scheduler delay between process exit and file flush.
+// record, tolerating scheduler delay between process exit and file flush. A
+// UTF-8 BOM is stripped defensively so exit-code parsing never sees it.
 func readMetaFile(path string) string {
 	deadline := time.Now().Add(metaReadGracePeriod)
 	for {
 		if data, err := os.ReadFile(path); err == nil {
-			return strings.TrimSpace(string(data))
+			return strings.TrimSpace(strings.TrimPrefix(string(data), "\ufeff"))
 		}
 		if time.Now().After(deadline) {
 			return ""
