@@ -1,4 +1,4 @@
-# Shell (com.nintycat.shell)
+# NintyShell (com.nintycat.shell)
 
 DBX 插件：在工作台里打开本地 Shell 终端，输入并执行 shell 命令。
 

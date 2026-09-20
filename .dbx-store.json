@@ -1,5 +1,5 @@
 {
-  "name": "Shell",
+  "name": "NintyShell",
   "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
   "icon": "assets/plugin.svg",
   "tags": ["terminal", "ssh", "sftp", "shell"],
@@ -10,7 +10,7 @@
   "releaseNotes": "Windows support for the Local Shell connection (auto-selected powershell.exe, command wrapper with exit-code and working-directory reporting) and platform-aware shell defaults; panic log moved from /tmp to the user cache directory with tightened permissions; collapsible activity log in the file panel.",
   "localizations": {
     "zh-CN": {
-      "name": "Shell",
+      "name": "NintyShell",
       "description": "在 DBX 工作台中打开本地 Shell 与 SSH/SFTP 终端，执行命令并管理远程文件。"
     }
   }

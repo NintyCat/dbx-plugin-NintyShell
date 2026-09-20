@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/t8y2/dbx/main/plugins/manifest.schema.json",
   "manifest_version": 1,
   "id": "com.nintycat.shell",
-  "name": "Shell",
+  "name": "NintyShell",
   "version": "0.6.0",
   "publisher": "nintycat",
   "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
@@ -156,7 +156,7 @@
   ],
   "localizations": {
     "zh-CN": {
-      "name": "Shell",
+      "name": "NintyShell",
       "description": "在 DBX 工作台中打开本地 Shell 与 SSH/SFTP 终端，执行命令并管理远程文件。",
       "contributions": {
         "com.nintycat.shell.connection": {
