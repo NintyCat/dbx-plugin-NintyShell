@@ -253,7 +253,8 @@
           ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
           legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
           setPanelTitle: "Settings",
-          followBtn: "Follow",
+          followOn: "Follow · on",
+          followOff: "Follow · off",
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
           retry: "Retry",
@@ -298,7 +299,8 @@
           ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
           legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
           setPanelTitle: "设置",
-          followBtn: "联动",
+          followOn: "联动 · 开",
+          followOff: "联动 · 关",
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
           retry: "重试",
@@ -380,9 +382,15 @@
         terminal.style.fontSize = settings.fontSize + "px";
         setFontSizeVal.textContent = settings.fontSize + "px";
       }
+      function updateFollowButton() {
+        btnFollow.classList.toggle("active", !!settings.sftpFollowCwd);
+        btnFollow.textContent = settings.sftpFollowCwd ? text.followOn : text.followOff;
+        btnFollow.title = text.followTip;
+      }
+
       function syncSettingsInputs() {
         setFontSizeInput.value = settings.fontSize;
-        btnFollow.classList.toggle("active", !!settings.sftpFollowCwd);
+        updateFollowButton();
       }
 
       function localize() {
@@ -397,8 +405,7 @@
         btnMkdir.textContent = text.mkdir;
         btnUpload.textContent = text.upload;
         setPanelTitle.textContent = text.setPanelTitle;
-        btnFollow.textContent = text.followBtn;
-        btnFollow.title = text.followTip;
+        updateFollowButton();
         setFontSizeLabel.textContent = text.setFontSize;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
@@ -1506,6 +1513,7 @@
       btnFollow.addEventListener("click", () => {
         settings.sftpFollowCwd = !settings.sftpFollowCwd;
         saveSettings();
+        updateFollowButton();
         try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: settings.sftpFollowCwd }).catch(() => {}); } catch (_) {}
         if (settings.sftpFollowCwd && filePanelOpen) openFiles(remoteCwd);
       });
