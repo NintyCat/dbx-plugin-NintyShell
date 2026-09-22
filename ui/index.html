@@ -37,7 +37,6 @@
       .set-row { display: flex; align-items: center; gap: 8px; line-height: 1.4; }
       .set-row span { flex: 1; }
       .set-row input[type="range"] { flex: 1; }
-      #setDownloadDir { flex: 1.4; min-width: 0; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 4px 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
       .set-note { font-size: 11px; opacity: .6; }
       button { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 12px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
       button:hover:not(:disabled) { background: color-mix(in srgb, CanvasText 7%, transparent); }
@@ -137,7 +136,6 @@
       <div class="set-title" id="setPanelTitle"></div>
       <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
       <label class="set-row"><input type="checkbox" id="setDblClick"><span id="setDblClickLabel"></span></label>
-      <div class="set-row"><span id="setDownloadDirLabel"></span><input type="text" id="setDownloadDir" spellcheck="false"></div>
     </div>
     <div id="contentRow">
       <main id="ptyHost" hidden></main>
@@ -232,7 +230,6 @@
       const logCount = $("logCount"), logClear = $("logClear");
       const btnGo = $("btnGo"), btnRefresh = $("btnRefresh"), btnMkdir = $("btnMkdir"), btnUpload = $("btnUpload");
       const fileTable = $("fileTable"), fileStatus = $("fileStatus");
-      const setDownloadDirInput = $("setDownloadDir");
       const uploadInput = $("uploadInput");
       const modal = $("modal"), modalTitle = $("modalTitle"), modalInput = $("modalInput");
       const modalOk = $("modalOk"), modalCancel = $("modalCancel");
@@ -264,7 +261,7 @@
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
           setDblClick: "Enter directories on double-click",
-          setDownloadDir: "Download directory",
+          saveToTitle: (name) => "Save \"" + name + "\" to",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -314,7 +311,7 @@
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
           setDblClick: "双击进入目录",
-          setDownloadDir: "下载目录",
+          saveToTitle: (name) => "将 \"" + name + "\" 保存到",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -403,7 +400,6 @@
       function syncSettingsInputs() {
         setFontSizeInput.value = settings.fontSize;
         setDblClick.checked = !!settings.dblClickNavigate;
-        setDownloadDirInput.value = settings.downloadDir || "~/Downloads";
         updateFollowButton();
       }
 
@@ -424,7 +420,6 @@
         btnJump.title = text.jumpTip;
         setFontSizeLabel.textContent = text.setFontSize;
         setDblClickLabel.textContent = text.setDblClick;
-        setDownloadDirLabel.textContent = text.setDownloadDir;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
         if (!running) badge.textContent = dot.className.includes("err") ? text.disconnected : text.ready;
@@ -1118,12 +1113,17 @@
       }
 
       async function downloadFile(entry) {
+        let dir = await promptModal(text.saveToTitle(entry.name), settings.downloadDir || "~/Downloads");
+        if (dir === null) return; // cancelled
+        dir = String(dir).trim() || "~/Downloads";
+        settings.downloadDir = dir;
+        try { localStorage.setItem("nintyshell.settings", JSON.stringify(settings)); } catch (_) {}
         try {
           fileStatusLine(text.downloading(entry.name));
           const result = await window.dbxPlugin.invoke("sftp/download", {
             connectionId,
             path: entry.path,
-            localDir: settings.downloadDir || "~/Downloads",
+            localDir: dir,
           });
           fileStatusLine(text.downloaded(result.localPath || ""));
           logEntry(text.logDownloadDone(result.localPath || ""), "ok");
@@ -1558,12 +1558,6 @@
         settings.dblClickNavigate = setDblClick.checked;
         saveSettings();
         if (filePanelOpen && lastEntries) renderFiles(lastEntries);
-      });
-      setDownloadDirInput.addEventListener("change", () => {
-        const value = setDownloadDirInput.value.trim();
-        settings.downloadDir = value || "~/Downloads";
-        setDownloadDirInput.value = settings.downloadDir;
-        saveSettings();
       });
 
       btnClear.addEventListener("click", () => {
