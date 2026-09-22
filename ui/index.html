@@ -66,15 +66,15 @@
       #filePathInput { flex: 1; min-width: 160px; font-family: ui-monospace, Menlo, monospace; }
       #localDirInput { width: 180px; }
       #fileTable { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid color-mix(in srgb, CanvasText 12%, transparent); border-radius: 10px; }
-      .file-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, CanvasText 7%, transparent); }
+      .file-row { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, CanvasText 7%, transparent); }
       .file-row:hover { background: color-mix(in srgb, CanvasText 5%, transparent); }
-      .file-row.header { font-size: 11px; opacity: .6; position: sticky; top: 0; background: var(--color-background, Canvas); }
-      .file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; cursor: pointer; }
-      .file-name.dir { color: var(--color-primary, #2563eb); font-weight: 600; }
-      .file-size { width: 90px; text-align: right; font-size: 11px; opacity: .65; flex: none; }
-      .file-time { width: 150px; font-size: 11px; opacity: .5; flex: none; }
-      .file-ops { display: flex; gap: 4px; flex: none; }
-      .file-ops button { padding: 2px 8px; font-size: 11px; border-radius: 6px; }
+      .file-icon { flex: none; font-size: 13px; }
+      .file-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+      .file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+      .file-name.dir { color: var(--color-primary, #2563eb); font-weight: 600; cursor: pointer; }
+      .file-meta { font-size: 10.5px; opacity: .55; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .file-ops { display: flex; gap: 3px; flex: none; }
+      .file-ops button { padding: 1px 6px; font-size: 11px; border-radius: 6px; }
       .file-status { min-height: 18px; padding-top: 6px; font-size: 11px; opacity: .7; }
       .file-log-wrap { border-top: 1px solid color-mix(in srgb, CanvasText 10%, transparent); margin-top: 4px; }
       .file-log-head { display: flex; align-items: center; gap: 6px; padding: 5px 0 4px; cursor: pointer; user-select: none; font-size: 11px; opacity: .55; }
@@ -1005,6 +1005,14 @@
         return isNaN(date) ? iso : date.toLocaleString();
       }
 
+      // Compact timestamp for the narrow sidebar meta line.
+      function formatTimeShort(iso) {
+        if (!iso) return "";
+        const date = new Date(iso);
+        if (isNaN(date)) return iso;
+        return date.toLocaleString([], { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+      }
+
       async function openFiles(path) {
         filePanel.hidden = false;
         fileStatusLine(text.listing);
@@ -1022,15 +1030,6 @@
 
       function renderFiles(entries) {
         fileTable.replaceChildren();
-        const headerRow = document.createElement("div");
-        headerRow.className = "file-row header";
-        const nameH = document.createElement("span"); nameH.className = "file-name"; nameH.textContent = text.colName;
-        const sizeH = document.createElement("span"); sizeH.className = "file-size"; sizeH.textContent = text.colSize;
-        const timeH = document.createElement("span"); timeH.className = "file-time"; timeH.textContent = text.colTime;
-        const opsH = document.createElement("span"); opsH.className = "file-ops";
-        headerRow.append(nameH, sizeH, timeH, opsH);
-        fileTable.appendChild(headerRow);
-
         const parent = parentPath(remoteCwd);
         if (parent !== null) {
           fileTable.appendChild(fileRow({ name: text.parentDir, path: parent, isDir: true, parent: true }, null));
@@ -1043,40 +1042,49 @@
       function fileRow(entry, base) {
         const row = document.createElement("div");
         row.className = "file-row";
+        const icon = document.createElement("span");
+        icon.className = "file-icon";
+        icon.textContent = entry.isDir ? "📁" : "📄";
+        const main = document.createElement("span");
+        main.className = "file-main";
         const name = document.createElement("span");
         name.className = "file-name" + (entry.isDir ? " dir" : "");
-        name.textContent = (entry.isDir ? "📁 " : "📄 ") + entry.name;
-        name.addEventListener("click", () => {
-          if (entry.isDir) openFiles(entry.path);
-        });
-        const size = document.createElement("span");
-        size.className = "file-size";
-        size.textContent = entry.parent ? "" : entry.isDir ? "—" : formatSize(entry.size || 0);
-        const time = document.createElement("span");
-        time.className = "file-time";
-        time.textContent = entry.parent ? "" : formatTime(entry.modifiedAt);
+        name.textContent = entry.name;
+        name.title = entry.name;
+        if (entry.isDir) {
+          name.addEventListener("click", () => openFiles(entry.path));
+        }
+        const meta = document.createElement("span");
+        meta.className = "file-meta";
+        meta.textContent = entry.parent ? "" : entry.isDir
+          ? formatTimeShort(entry.modifiedAt)
+          : [formatSize(entry.size || 0), formatTimeShort(entry.modifiedAt)].filter(Boolean).join(" · ");
+        main.append(name, meta);
         const ops = document.createElement("span");
         ops.className = "file-ops";
         if (!entry.parent) {
           if (!entry.isDir) {
             const download = document.createElement("button");
             download.type = "button";
-            download.textContent = text.opDownload;
+            download.textContent = "⬇";
+            download.title = text.opDownload;
             download.addEventListener("click", () => downloadFile(entry));
             ops.appendChild(download);
           }
           const rename = document.createElement("button");
           rename.type = "button";
-          rename.textContent = text.opRename;
+          rename.textContent = "✎";
+          rename.title = text.opRename;
           rename.addEventListener("click", () => renameEntry(entry));
           ops.appendChild(rename);
           const del = document.createElement("button");
           del.type = "button";
-          del.textContent = text.opDelete;
+          del.textContent = "✕";
+          del.title = text.opDelete;
           del.addEventListener("click", () => deleteEntry(entry));
           ops.appendChild(del);
         }
-        row.append(name, size, time, ops);
+        row.append(icon, main, ops);
         return row;
       }
 
