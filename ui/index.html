@@ -135,10 +135,7 @@
     </header>
     <div id="settingsPanel" hidden>
       <div class="set-title" id="setPanelTitle"></div>
-      <label class="set-row"><input type="checkbox" id="setFollowCwd"><span id="setFollowLabel"></span></label>
-      <label class="set-row"><input type="checkbox" id="setInjectOsc7"><span id="setInjectLabel"></span></label>
       <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
-      <div class="set-note" id="setNote"></div>
     </div>
     <div id="contentRow">
       <main id="ptyHost" hidden></main>
@@ -158,6 +155,7 @@
         <input id="filePathInput" placeholder="/" aria-label="remote path" />
         <button id="btnGo" type="button"></button>
         <button id="btnRefresh" type="button"></button>
+        <button id="btnFollow" type="button" hidden title=""></button>
         <button id="btnMkdir" type="button"></button>
         <button id="btnUpload" type="button"></button>
         <input id="localDirInput" placeholder="~/Downloads" aria-label="local download directory" />
@@ -224,7 +222,7 @@
       const btnClear = $("btnClear"), btnCancel = $("btnCancel");
       const ptyHost = $("ptyHost");
       const btnSettings = $("btnSettings"), settingsPanel = $("settingsPanel");
-      const setFollowCwd = $("setFollowCwd"), setInjectOsc7 = $("setInjectOsc7"), setFontSizeInput = $("setFontSize");
+      const btnFollow = $("btnFollow"), setFontSizeInput = $("setFontSize");
       const setFontSizeVal = $("setFontSizeVal");
       const filePanel = $("filePanel"), filePathInput = $("filePathInput"), fileLog = $("fileLog");
       const logTitle = $("logTitle"), logWrap = $("logWrap"), logHead = $("logHead");
@@ -255,10 +253,9 @@
           ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
           legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
           setPanelTitle: "Settings",
-          setFollow: "File panel follows the terminal path",
-          setInject: "Inject cwd reporting into remote SSH shells",
+          followBtn: "Follow",
+          followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
-          setNote: "Path following uses the OSC 7 shell report: automatic for local bash/zsh/PowerShell and for remote SSH (injection is on by default).",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -301,10 +298,9 @@
           ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
           legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
           setPanelTitle: "设置",
-          setFollow: "文件面板跟随终端路径联动",
-          setInject: "向远程 SSH shell 注入路径上报",
+          followBtn: "联动",
+          followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
-          setNote: "路径联动依赖 shell 的 OSC 7 上报：本地 bash/zsh/PowerShell 与远程 SSH（自动注入）默认启用，不需要远程机器做任何配置。",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -365,7 +361,7 @@
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
       // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
-      const settingsDefaults = { sftpFollowCwd: true, injectOsc7: true, fontSize: 12.5 };
+      const settingsDefaults = { sftpFollowCwd: true, fontSize: 12.5 };
       let settings = loadSettings();
       function loadSettings() {
         try {
@@ -385,9 +381,8 @@
         setFontSizeVal.textContent = settings.fontSize + "px";
       }
       function syncSettingsInputs() {
-        setFollowCwd.checked = !!settings.sftpFollowCwd;
-        setInjectOsc7.checked = !!settings.injectOsc7;
         setFontSizeInput.value = settings.fontSize;
+        btnFollow.classList.toggle("active", !!settings.sftpFollowCwd);
       }
 
       function localize() {
@@ -402,10 +397,9 @@
         btnMkdir.textContent = text.mkdir;
         btnUpload.textContent = text.upload;
         setPanelTitle.textContent = text.setPanelTitle;
-        setFollowLabel.textContent = text.setFollow;
-        setInjectLabel.textContent = text.setInject;
+        btnFollow.textContent = text.followBtn;
+        btnFollow.title = text.followTip;
         setFontSizeLabel.textContent = text.setFontSize;
-        setNote.textContent = text.setNote;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
         if (!running) badge.textContent = dot.className.includes("err") ? text.disconnected : text.ready;
@@ -647,9 +641,10 @@
           remoteCwd = cwd || "/";
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
-          try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.injectOsc7 }).catch(() => {}); } catch (_) {}
+          try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.sftpFollowCwd }).catch(() => {}); } catch (_) {}
           // 文件侧边栏走 SFTP，只有 SSH 会话可用；SSH 默认展开并联动
           btnFiles.hidden = sessionKind !== "ssh";
+          btnFollow.hidden = sessionKind !== "ssh";
           filePanelOpen = sessionKind === "ssh";
           if (info.pty || sessionKind === "ssh") {
             initPTY();
@@ -1508,15 +1503,11 @@
         settingsPanel.hidden = !settingsPanel.hidden;
         if (!settingsPanel.hidden) syncSettingsInputs();
       });
-      setFollowCwd.addEventListener("change", () => {
-        settings.sftpFollowCwd = setFollowCwd.checked;
+      btnFollow.addEventListener("click", () => {
+        settings.sftpFollowCwd = !settings.sftpFollowCwd;
         saveSettings();
-        if (settings.sftpFollowCwd && sessionKind === "ssh" && filePanelOpen) openFiles(remoteCwd);
-      });
-      setInjectOsc7.addEventListener("change", () => {
-        settings.injectOsc7 = setInjectOsc7.checked;
-        saveSettings();
-        try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: settings.injectOsc7 }).catch(() => {}); } catch (_) {}
+        try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: settings.sftpFollowCwd }).catch(() => {}); } catch (_) {}
+        if (settings.sftpFollowCwd && filePanelOpen) openFiles(remoteCwd);
       });
       setFontSizeInput.addEventListener("input", () => {
         const value = parseFloat(setFontSizeInput.value);
