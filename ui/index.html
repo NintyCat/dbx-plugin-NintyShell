@@ -261,7 +261,7 @@
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
           setDblClick: "Enter directories on double-click",
-          saveToTitle: (name) => "Save \"" + name + "\" to",
+          pickDirHint: "Choose a download folder in the dialog…",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -311,7 +311,7 @@
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
           setDblClick: "双击进入目录",
-          saveToTitle: (name) => "将 \"" + name + "\" 保存到",
+          pickDirHint: "请在弹出的对话框中选择下载目录…",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -372,7 +372,7 @@
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
       // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
-      const settingsDefaults = { sftpFollowCwd: true, dblClickNavigate: false, fontSize: 12.5, downloadDir: "~/Downloads" };
+      const settingsDefaults = { sftpFollowCwd: true, dblClickNavigate: false, fontSize: 12.5 };
       let settings = loadSettings();
       function loadSettings() {
         try {
@@ -1113,18 +1113,17 @@
       }
 
       async function downloadFile(entry) {
-        let dir = await promptModal(text.saveToTitle(entry.name), settings.downloadDir || "~/Downloads");
-        if (dir === null) return; // cancelled
-        dir = String(dir).trim() || "~/Downloads";
-        settings.downloadDir = dir;
-        try { localStorage.setItem("nintyshell.settings", JSON.stringify(settings)); } catch (_) {}
         try {
-          fileStatusLine(text.downloading(entry.name));
+          fileStatusLine(text.pickDirHint);
           const result = await window.dbxPlugin.invoke("sftp/download", {
             connectionId,
             path: entry.path,
-            localDir: dir,
+            pickDir: true,
           });
+          if (result && result.cancelled) {
+            fileStatusLine("");
+            return;
+          }
           fileStatusLine(text.downloaded(result.localPath || ""));
           logEntry(text.logDownloadDone(result.localPath || ""), "ok");
         } catch (error) {

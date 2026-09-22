@@ -251,6 +251,15 @@ func (p *plugin) sftpDownload(values map[string]any) (any, *dbxpluginsdk.PluginE
 		return fail("Cannot download a directory")
 	}
 	localDir := stringField(values, "localDir")
+	if pick, _ := values["pickDir"].(bool); pick {
+		// The user picks the destination in a native folder chooser; a
+		// cancelled dialog aborts the download without an error.
+		chosen, ok := pickDownloadDir()
+		if !ok {
+			return map[string]any{"success": true, "cancelled": true}, nil
+		}
+		localDir = chosen
+	}
 	if expanded, ok := expandHome(localDir); ok {
 		localDir = expanded
 	}
