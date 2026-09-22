@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -57,13 +58,102 @@ func runDiagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
 	code, alive = spawnPlainWait(argv, dir, ours)
 	ptyLogf("diag: plain powershell env=ours -> %s", fmtExit(code, alive, 2*time.Second))
 
+	liveProbe(argv, dir, ours, "live powershell env=ours")
 	conptyProbe(argv, dir, nil, false, "conpty powershell env=inherit")
-	conptyProbe(argv, dir, ours, false, "conpty powershell env=ours")
-	conptyProbe(argv, dir, ours, true, "conpty powershell env=ours USESTDHANDLES")
 	if cmd, err := exec.LookPath("cmd.exe"); err == nil {
 		conptyProbe([]string{cmd, "/c", "echo diag_ok"}, dir, nil, false, "conpty cmd /c echo env=inherit")
 	}
 	ptyLogf("diag: probes done")
+}
+
+// liveProbe inspects a running pseudo console child: which visible windows
+// belong to it, does typing into the console come back through the output
+// pipe, and does closing the console kill it.
+func liveProbe(argv []string, dir string, env []string, label string) {
+	c, err := spawnConPTY(argv, dir, 80, 24, env, false)
+	if err != nil {
+		ptyLogf("diag: %s -> spawn err %v", label, err)
+		return
+	}
+	var mu sync.Mutex
+	var all []byte
+	stop := make(chan struct{})
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := c.Read(buf)
+			if n > 0 {
+				mu.Lock()
+				all = append(all, buf[:n]...)
+				mu.Unlock()
+			}
+			if err != nil {
+				close(stop)
+				return
+			}
+		}
+	}()
+	time.Sleep(1200 * time.Millisecond)
+	childWindows := visibleWindowsOf(c.Pid())
+	time.Sleep(300 * time.Millisecond)
+
+	const marker = "mark_7f3d"
+	_, _ = c.Write([]byte("echo " + marker + "\r"))
+	time.Sleep(1500 * time.Millisecond)
+
+	mu.Lock()
+	echoed := strings.Contains(string(all), marker)
+	output := append([]byte(nil), all...)
+	mu.Unlock()
+
+	time.Sleep(300 * time.Millisecond)
+	c.closeConsole()
+	event, _ := windows.WaitForSingleObject(c.process, 1500)
+	stillAlive := uint32(event) == uint32(windows.WAIT_TIMEOUT)
+	var code uint32
+	_ = windows.GetExitCodeProcess(c.process, &code)
+	_ = c.release()
+
+	ptyLogf("diag: %s -> child pid %d visible-windows=%v echoed-marker=%v bytes=%d%s attach-close-kills=%v final %s",
+		label, c.Pid(), childWindows, echoed, len(output), previewSuffix(output), !stillAlive, fmtExit(code, stillAlive, 0))
+}
+
+// visibleWindowsOf lists the window classes of all visible top-level
+// windows that belong to pid. A pseudo console child is headless, so any
+// hit means the PSEUDOCONSOLE attribute was ignored and the child opened
+// its own (delegated) console.
+func visibleWindowsOf(pid uint32) []string {
+	var (
+		mu    sync.Mutex
+		found []string
+	)
+	callback := syscall.NewCallback(func(hwnd windows.HWND, lparam unsafe.Pointer) uintptr {
+		if !windows.IsWindowVisible(hwnd) {
+			return 1
+		}
+		var owner uint32
+		_, _ = windows.GetWindowThreadProcessId(hwnd, &owner)
+		if owner == pid {
+			mu.Lock()
+			found = append(found, windowClass(hwnd))
+			mu.Unlock()
+		}
+		return 1
+	})
+	_ = windows.EnumWindows(callback, nil)
+	return found
+}
+
+var user32DLL = windows.NewLazySystemDLL("user32.dll")
+var procGetClassNameW = user32DLL.NewProc("GetClassNameW")
+
+func windowClass(hwnd windows.HWND) string {
+	buf := make([]uint16, 256)
+	n, _, _ := procGetClassNameW.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
+	if n == 0 {
+		return "?"
+	}
+	return windows.UTF16ToString(buf[:int(n)])
 }
 
 // rtlGetVersionForLog records the Windows build the sidecar runs on so

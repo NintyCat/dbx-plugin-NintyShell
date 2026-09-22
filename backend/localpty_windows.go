@@ -66,6 +66,7 @@ type conptyProc struct {
 	cmdOut        windows.Handle // shell output (we read)
 	process       windows.Handle
 	thread        windows.Handle
+	pid           uint32
 	attrs         *windows.ProcThreadAttributeListContainer
 	consoleClosed bool
 }
@@ -142,9 +143,13 @@ func spawnConPTY(argv []string, dir string, cols, rows uint16, env []string, use
 		cmdOut:  cmdOut,
 		process: pi.Process,
 		thread:  pi.Thread,
+		pid:     pi.ProcessId,
 		attrs:   attrs,
 	}, nil
 }
+
+// Pid reports the attached process id.
+func (c *conptyProc) Pid() uint32 { return c.pid }
 
 func closeConsoleAndPipes(con windows.Handle, pipes ...windows.Handle) {
 	windows.ClosePseudoConsole(con)

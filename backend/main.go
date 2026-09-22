@@ -1189,7 +1189,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.7.5"
+	pluginVersion = "0.7.6"
 )
 
 func main() {
