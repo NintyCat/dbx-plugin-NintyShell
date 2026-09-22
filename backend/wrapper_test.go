@@ -46,7 +46,7 @@ func TestPowershellWrapper(t *testing.T) {
 	if !strings.Contains(script, `'C:\tmp\dbx''s meta\x.meta'`) {
 		t.Errorf("wrapper must escape single quotes in the meta path, got:\n%s", script)
 	}
-	for _, want := range []string{"$rc = 0", "$LASTEXITCODE", "[System.IO.File]::WriteAllText", "UTF8Encoding($false)", "try {", "} catch {"} {
+	for _, want := range []string{"$rc = 0", "$LASTEXITCODE", "[System.IO.File]::WriteAllText", "UTF8Encoding($false)", "try {", "} catch {", "[Console]::OutputEncoding"} {
 		if !strings.Contains(script, want) {
 			t.Errorf("wrapper missing %q", want)
 		}

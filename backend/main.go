@@ -697,7 +697,8 @@ func startCommand(shellPath, command, dir string, emitter *dbxpluginsdk.Emitter,
 		rc.metaPath = metaPath
 		cmd.Args = []string{shellPath, "-NoProfile", "-NonInteractive", "-EncodedCommand", encodePowerShellScript(powershellWrapper(command, metaPath))}
 	case style == cmdShell:
-		cmd.Args = []string{shellPath, "/C", command}
+		// chcp pins UTF-8 so Chinese output survives the UI's UTF-8 decode.
+		cmd.Args = []string{shellPath, "/C", "chcp 65001 >nul & " + command}
 	case runtime.GOOS == "windows":
 		// POSIX-style shell on Windows (git bash / MSYS): `-c` works, but
 		// ExtraFiles/fd 3 do not, so no meta reporting (exit code falls
@@ -736,6 +737,10 @@ func startCommand(shellPath, command, dir string, emitter *dbxpluginsdk.Emitter,
 func powershellWrapper(command, metaPath string) string {
 	escapedPath := strings.ReplaceAll(metaPath, "'", "''")
 	return strings.Join([]string{
+		// Chinese-locale Windows defaults to GBK console output, which the UI
+		// decodes as UTF-8 mojibake; force UTF-8 before anything prints.
+		"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+		"$OutputEncoding = [System.Text.Encoding]::UTF8",
 		"$ErrorActionPreference = 'Continue'",
 		"$rc = 0",
 		"try {",
@@ -1221,7 +1226,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.7.7"
+	pluginVersion = "0.7.8"
 )
 
 func main() {

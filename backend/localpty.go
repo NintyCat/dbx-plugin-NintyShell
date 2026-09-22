@@ -30,9 +30,11 @@ type eventEmitter interface {
 func localPTYArgv(shellPath string) []string {
 	switch shellStyleFor(shellPath) {
 	case powershellShell:
-		return []string{shellPath, "-NoLogo"}
+		// -NoExit keeps the session interactive; the command pins UTF-8 so
+		// ConPTY output survives the UI's UTF-8 decode.
+		return []string{shellPath, "-NoLogo", "-NoExit", "-Command", "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8"}
 	case cmdShell:
-		return []string{shellPath}
+		return []string{shellPath, "/K", "chcp 65001 >nul"}
 	default:
 		return []string{shellPath, "-l"}
 	}
