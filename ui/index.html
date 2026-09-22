@@ -29,6 +29,8 @@
       .tab.active { background: var(--color-background, Canvas); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
       .meta { flex: 1; min-width: 0; font-size: 11px; opacity: .5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .actions { display: flex; gap: 8px; flex: none; }
+      button.active { background: color-mix(in srgb, CanvasText 8%, transparent); border-color: color-mix(in srgb, CanvasText 30%, transparent); }
+      #contentRow { flex: 1; min-height: 0; display: flex; }
       #settingsPanel { position: fixed; top: 48px; right: 10px; z-index: 30; width: 300px; padding: 12px 14px; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 12px; background: var(--color-background, Canvas); box-shadow: 0 10px 36px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
       #settingsPanel[hidden] { display: none; }
       #settingsPanel .set-title { font-weight: 600; }
@@ -39,7 +41,7 @@
       button { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 12px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
       button:hover:not(:disabled) { background: color-mix(in srgb, CanvasText 7%, transparent); }
       button:disabled { opacity: .4; cursor: default; }
-      #terminal { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 18px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; cursor: text; }
+      #terminal { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding: 12px 14px 18px; font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; cursor: text; }
       .block { margin: 0 0 12px; }
       .cmdline { white-space: pre-wrap; word-break: break-all; }
       .prompt { color: var(--color-primary, #2563eb); font-weight: 700; }
@@ -58,7 +60,7 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       .retry { margin-top: 6px; }
       /* file panel */
-      #filePanel { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 14px 12px; }
+      #filePanel { flex: none; width: 330px; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px 12px; border-left: 1px solid color-mix(in srgb, CanvasText 14%, transparent); }
       .file-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
       .file-toolbar input { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 10px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
       #filePathInput { flex: 1; min-width: 160px; font-family: ui-monospace, Menlo, monospace; }
@@ -111,7 +113,7 @@
       /* ptyHost 是 FitAddon 的测量父元素：computed height 在 border-box 下含 padding，
          但 FitAddon 只减 .xterm 自身的 padding，所以内边距必须挂在 .xterm 上，
          否则行数多算约一个 padding 的高度，最后一行被 overflow:hidden 裁掉。 */
-      #ptyHost { flex: 1; min-height: 0; background: #16181d; overflow: hidden; }
+      #ptyHost { flex: 1; min-width: 0; min-height: 0; background: #16181d; overflow: hidden; }
       #ptyHost .xterm { height: 100%; padding: 8px 10px 10px; }
       [hidden] { display: none !important; }
     </style>
@@ -123,12 +125,9 @@
         <span id="connName">Shell</span>
         <span class="badge" id="badge"></span>
       </div>
-      <div class="tabs">
-        <button class="tab active" id="tabTerminal" type="button"></button>
-        <button class="tab" id="tabFiles" type="button"></button>
-      </div>
       <div class="meta" id="shellMeta"></div>
       <div class="actions">
+        <button id="btnFiles" type="button" hidden></button>
         <button id="btnClear" type="button"></button>
         <button id="btnCancel" type="button" disabled></button>
         <button id="btnSettings" type="button" aria-label="settings">⚙</button>
@@ -141,8 +140,9 @@
       <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
       <div class="set-note" id="setNote"></div>
     </div>
-    <main id="ptyHost" hidden></main>
-    <main id="terminal" hidden>
+    <div id="contentRow">
+      <main id="ptyHost" hidden></main>
+      <main id="terminal" hidden>
       <div class="inputline" id="inputLine" hidden>
         <div class="completions" id="completions" hidden></div>
         <span class="prompt" id="inputPrompt"></span>
@@ -175,6 +175,7 @@
       </div>
       <input type="file" id="uploadInput" hidden />
     </section>
+    </div>
     <div id="empty">
       <div class="card">
         <h2 id="emptyTitle">Shell</h2>
@@ -216,7 +217,7 @@
       const $ = (id) => document.getElementById(id);
       const header = $("header"), terminal = $("terminal"), empty = $("empty");
       const dot = $("dot"), badge = $("badge"), connName = $("connName"), shellMeta = $("shellMeta");
-      const tabTerminal = $("tabTerminal"), tabFiles = $("tabFiles");
+      const btnFiles = $("btnFiles");
       const inputLine = $("inputLine"), input = $("input"), inputPrompt = $("inputPrompt");
       const completionsEl = $("completions");
       const runningLine = $("runningLine"), runningText = $("runningText");
@@ -238,7 +239,7 @@
         en: {
           ready: "Ready", running: "Running", disconnected: "Disconnected",
           clear: "Clear", cancel: "Interrupt",
-          tabTerminal: "Terminal", tabFiles: "Files",
+          filesBtn: "Files",
           go: "Go", refresh: "Refresh", mkdir: "New folder", upload: "Upload",
           colName: "Name", colSize: "Size", colTime: "Modified", opDownload: "Download", opDelete: "Delete", opRename: "Rename",
           parentDir: ".. (parent)",
@@ -284,7 +285,7 @@
         zh: {
           ready: "就绪", running: "执行中", disconnected: "未连接",
           clear: "清屏", cancel: "中断",
-          tabTerminal: "终端", tabFiles: "文件",
+          filesBtn: "文件",
           go: "转到", refresh: "刷新", mkdir: "新建目录", upload: "上传",
           colName: "名称", colSize: "大小", colTime: "修改时间", opDownload: "下载", opDelete: "删除", opRename: "重命名",
           parentDir: ".. (上级目录)",
@@ -344,7 +345,7 @@
       let historyIndex = -1;
       let draft = "";
 
-      let activeTab = "terminal";
+      let filePanelOpen = false;
       let remoteCwd = "/";
       let uploadBusy = false;
 
@@ -393,8 +394,7 @@
         btnClear.textContent = text.clear;
         btnCancel.textContent = text.cancel;
         runningText.textContent = text.runningText;
-        tabTerminal.textContent = text.tabTerminal;
-        tabFiles.textContent = text.tabFiles;
+        btnFiles.textContent = text.filesBtn;
         logTitle.textContent = text.logTitle;
         logClear.textContent = text.logClear;
         btnGo.textContent = text.go;
@@ -422,18 +422,18 @@
         inputPrompt.textContent = shortCwd() + " ❯";
       }
 
-      // ---- view tabs ----
+      // ---- view layout ----
 
-      function showTab(tab) {
-        activeTab = tab;
-        tabTerminal.className = "tab" + (tab === "terminal" ? " active" : "");
-        tabFiles.className = "tab" + (tab === "files" ? " active" : "");
-        terminal.hidden = tab !== "terminal" || ptyMode;
-        ptyHost.hidden = tab !== "terminal" || !ptyMode;
-        filePanel.hidden = tab !== "files";
-        if (tab === "terminal") {
+      // Terminal is the main view; the file panel is a sidebar toggled by the
+      // 📂 button (SFTP, SSH sessions only).
+      function applyView() {
+        terminal.hidden = ptyMode;
+        ptyHost.hidden = !ptyMode;
+        filePanel.hidden = !filePanelOpen;
+        btnFiles.classList.toggle("active", filePanelOpen);
+        schedulePtyResize();
+        if (!filePanelOpen) {
           if (ptyMode) {
-            schedulePtyResize();
             if (term) term.focus();
           } else if (!running) {
             input.focus();
@@ -441,10 +441,13 @@
         }
       }
 
-      tabTerminal.addEventListener("click", () => showTab("terminal"));
-      tabFiles.addEventListener("click", () => {
-        if (!running) openFiles(remoteCwd);
-      });
+      function toggleFilePanel() {
+        filePanelOpen = !filePanelOpen;
+        applyView();
+        if (filePanelOpen) openFiles(remoteCwd);
+      }
+
+      btnFiles.addEventListener("click", toggleFilePanel);
 
       // ---- terminal ----
 
@@ -530,7 +533,7 @@
         btnCancel.disabled = !value;
         dot.className = "dot " + (value ? "busy" : "ok");
         badge.textContent = value ? text.running : text.ready;
-        if (!value && activeTab === "terminal") input.focus();
+        if (!value) input.focus();
       }
 
       function setDisconnected() {
@@ -645,15 +648,16 @@
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
           try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.injectOsc7 }).catch(() => {}); } catch (_) {}
-          // 文件面板走 SFTP，只有 SSH 会话可用
-          tabFiles.hidden = sessionKind !== "ssh";
+          // 文件侧边栏走 SFTP，只有 SSH 会话可用
+          btnFiles.hidden = sessionKind !== "ssh";
           if (info.pty || sessionKind === "ssh") {
             initPTY();
-            showTab("terminal");
+            applyView();
             dot.className = "dot ok";
             badge.textContent = text.ready;
             setRunning(false);
           } else {
+            applyView();
             renderPrompt();
             const out = commandBlock("");
             appendText(out, text.welcome(shellPath || sessionKind, cwd));
@@ -761,7 +765,7 @@
           remoteCwd = cwd;
           if (!ptyMode) renderPrompt();
           // 文件面板跟随终端路径（设置项；SSH 会话才有文件面板）
-          if (settings.sftpFollowCwd && sessionKind === "ssh" && activeTab === "files" && !uploadBusy) scheduleFollowRefresh();
+          if (settings.sftpFollowCwd && sessionKind === "ssh" && filePanelOpen && !uploadBusy) scheduleFollowRefresh();
           return;
         }
         if (method === "shell/legacy-fallback") {
@@ -792,7 +796,7 @@
           cwd = params.cwd;
           remoteCwd = cwd;
           renderPrompt();
-          if (activeTab === "files") openFiles(remoteCwd);
+          if (filePanelOpen) openFiles(remoteCwd);
         }
         currentOut = null;
         setRunning(false);
@@ -812,7 +816,7 @@
       function showTerminal() {
         empty.hidden = true;
         header.hidden = false;
-        showTab("terminal");
+        applyView();
       }
 
       // ---- tab completion ----
@@ -1002,7 +1006,7 @@
       }
 
       async function openFiles(path) {
-        showTab("files");
+        filePanel.hidden = false;
         fileStatusLine(text.listing);
         try {
           const result = await window.dbxPlugin.invoke("sftp/list", { connectionId, path });
@@ -1487,7 +1491,7 @@
       let followTimer = null;
       function scheduleFollowRefresh() {
         clearTimeout(followTimer);
-        followTimer = setTimeout(() => { if (activeTab === "files") openFiles(remoteCwd); }, 800);
+        followTimer = setTimeout(() => { if (filePanelOpen) openFiles(remoteCwd); }, 800);
       }
 
       btnSettings.addEventListener("click", () => {
@@ -1497,7 +1501,7 @@
       setFollowCwd.addEventListener("change", () => {
         settings.sftpFollowCwd = setFollowCwd.checked;
         saveSettings();
-        if (settings.sftpFollowCwd && sessionKind === "ssh" && activeTab === "files") openFiles(remoteCwd);
+        if (settings.sftpFollowCwd && sessionKind === "ssh" && filePanelOpen) openFiles(remoteCwd);
       });
       setInjectOsc7.addEventListener("change", () => {
         settings.injectOsc7 = setInjectOsc7.checked;
