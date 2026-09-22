@@ -648,14 +648,16 @@
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
           try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.injectOsc7 }).catch(() => {}); } catch (_) {}
-          // 文件侧边栏走 SFTP，只有 SSH 会话可用
+          // 文件侧边栏走 SFTP，只有 SSH 会话可用；SSH 默认展开并联动
           btnFiles.hidden = sessionKind !== "ssh";
+          filePanelOpen = sessionKind === "ssh";
           if (info.pty || sessionKind === "ssh") {
             initPTY();
             applyView();
             dot.className = "dot ok";
             badge.textContent = text.ready;
             setRunning(false);
+            if (sessionKind === "ssh") openFiles(remoteCwd);
           } else {
             applyView();
             renderPrompt();
