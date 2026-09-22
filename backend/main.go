@@ -145,14 +145,20 @@ func guardPanic(where string) {
 	}
 }
 
+// panicLogPath holds panic dumps; pty lifecycle events go to pty.log in the
+// same directory (see ptyLogf).
 func panicLogPath() string {
+	return filepath.Join(pluginLogDir(), "panic.log")
+}
+
+func pluginLogDir() string {
 	if dir := strings.TrimSpace(os.Getenv("DBX_PLUGIN_DATA_DIR")); dir != "" {
-		return filepath.Join(dir, "panic.log")
+		return dir
 	}
 	if cache, err := os.UserCacheDir(); err == nil {
-		return filepath.Join(cache, "com.nintycat.shell", "panic.log")
+		return filepath.Join(cache, "com.nintycat.shell")
 	}
-	return filepath.Join(os.TempDir(), "nintyshell-panic.log")
+	return os.TempDir()
 }
 
 // withTimeout bounds a network call so a dead connection fails fast instead of
@@ -1183,7 +1189,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.7.0"
+	pluginVersion = "0.7.1"
 )
 
 func main() {

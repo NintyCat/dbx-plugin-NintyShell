@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 
@@ -93,7 +94,7 @@ func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) 
 		return nil, err
 	}
 
-	return &localPTY{
+	pty := &localPTY{
 		con:     con,
 		ptyIn:   ptyIn,
 		ptyOut:  ptyOut,
@@ -102,9 +103,26 @@ func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) 
 		process: pi.Process,
 		thread:  pi.Thread,
 		attrs:   attrs,
-	}, nil
+	}
+	pty.watchExit()
+	return pty, nil
 }
 
+// watchExit closes the pseudo console once the shell process exits. Unlike a
+// Unix pty, the ConPTY pipes never report EOF on their own, so a shell that
+// dies on startup (or after typing exit) would otherwise leave the terminal
+// frozen on a blank screen forever. The short drain delay lets the console
+// flush its final VT output before the pipes go away.
+func (l *localPTY) watchExit() {
+	go func() {
+		_, _ = windows.WaitForSingleObject(l.process, windows.INFINITE)
+		var code uint32
+		_ = windows.GetExitCodeProcess(l.process, &code)
+		ptyLogf("shell process exited, code=%d", code)
+		time.Sleep(400 * time.Millisecond)
+		_ = l.Close()
+	}()
+}
 func (l *localPTY) Read(p []byte) (int, error) {
 	var n uint32
 	err := windows.ReadFile(l.cmdOut, p, &n, nil)

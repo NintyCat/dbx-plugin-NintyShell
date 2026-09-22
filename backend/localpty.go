@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
 )
@@ -47,6 +50,27 @@ func localPTYEnv() []string {
 	return append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
 }
 
+// ptyLogf appends a line to pty.log next to the panic log. Unlike a Unix
+// pty, a Windows pseudo console never reports EOF when the shell process
+// dies, so this log is the only window into start failures and crashes on
+// that platform. Kept small: a few lines per session, truncated at 1 MB.
+func ptyLogf(format string, args ...any) {
+	dir := pluginLogDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return
+	}
+	path := filepath.Join(dir, "pty.log")
+	if info, err := os.Stat(path); err == nil && info.Size() > 1<<20 {
+		_ = os.Remove(path)
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, time.Now().Format("2006-01-02 15:04:05.000 ")+" "+format+"\n", args...)
+}
+
 // openLocalPTY starts the configured shell on a pseudo terminal and streams
 // raw output to the UI, mirroring the SSH PTY path: keystrokes arrive via
 // shell/input, resizes via shell/resize, and the read loop emits
@@ -54,16 +78,23 @@ func localPTYEnv() []string {
 func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 	pty, err := startLocalPTY(s.shellPath, s.cwd, localPtyDefaultCols, localPtyDefaultRows)
 	if err != nil {
+		ptyLogf("start failed shell=%q: %v", s.shellPath, err)
 		return err
 	}
+	ptyLogf("started shell=%q dir=%q", s.shellPath, s.cwd)
 	s.localPty = pty
 	sessionID := s.id
 	go func() {
 		defer guardPanic("local-pty-read")
 		buf := make([]byte, 8192)
+		firstOutput := true
 		for {
 			n, readErr := pty.Read(buf)
 			if n > 0 {
+				if firstOutput {
+					ptyLogf("first output: %d bytes", n)
+					firstOutput = false
+				}
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
 				_ = emitter.Event("shell/output", map[string]any{
@@ -72,6 +103,7 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 				})
 			}
 			if readErr != nil {
+				ptyLogf("read ended: %v (got output=%v)", readErr, !firstOutput)
 				s.mutex.Lock()
 				stopping := s.stopping
 				if !stopping {
