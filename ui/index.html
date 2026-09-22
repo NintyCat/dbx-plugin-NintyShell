@@ -136,6 +136,7 @@
     <div id="settingsPanel" hidden>
       <div class="set-title" id="setPanelTitle"></div>
       <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
+      <label class="set-row"><input type="checkbox" id="setDblClick"><span id="setDblClickLabel"></span></label>
       <div class="set-row"><span id="setDownloadDirLabel"></span><input type="text" id="setDownloadDir" spellcheck="false"></div>
     </div>
     <div id="contentRow">
@@ -224,6 +225,7 @@
       const ptyHost = $("ptyHost");
       const btnSettings = $("btnSettings"), settingsPanel = $("settingsPanel");
       const btnFollow = $("btnFollow"), btnJump = $("btnJump"), setFontSizeInput = $("setFontSize");
+      const setDblClick = $("setDblClick"), setDblClickLabel = $("setDblClickLabel");
       const setFontSizeVal = $("setFontSizeVal");
       const filePanel = $("filePanel"), filePathInput = $("filePathInput"), fileLog = $("fileLog");
       const logTitle = $("logTitle"), logWrap = $("logWrap"), logHead = $("logHead");
@@ -261,6 +263,7 @@
           followOff: "Follow · off",
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
+          setDblClick: "Enter directories on double-click",
           setDownloadDir: "Download directory",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
@@ -310,6 +313,7 @@
           followOff: "联动 · 关",
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
+          setDblClick: "双击进入目录",
           setDownloadDir: "下载目录",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
@@ -371,7 +375,7 @@
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
       // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
-      const settingsDefaults = { sftpFollowCwd: true, fontSize: 12.5, downloadDir: "~/Downloads" };
+      const settingsDefaults = { sftpFollowCwd: true, dblClickNavigate: false, fontSize: 12.5, downloadDir: "~/Downloads" };
       let settings = loadSettings();
       function loadSettings() {
         try {
@@ -398,6 +402,7 @@
 
       function syncSettingsInputs() {
         setFontSizeInput.value = settings.fontSize;
+        setDblClick.checked = !!settings.dblClickNavigate;
         setDownloadDirInput.value = settings.downloadDir || "~/Downloads";
         updateFollowButton();
       }
@@ -418,6 +423,7 @@
         btnJump.textContent = text.jumpBtn;
         btnJump.title = text.jumpTip;
         setFontSizeLabel.textContent = text.setFontSize;
+        setDblClickLabel.textContent = text.setDblClick;
         setDownloadDirLabel.textContent = text.setDownloadDir;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
@@ -1045,7 +1051,9 @@
         }
       }
 
+      let lastEntries = null;
       function renderFiles(entries) {
+        lastEntries = entries;
         fileTable.replaceChildren();
         const parent = parentPath(remoteCwd);
         if (parent !== null) {
@@ -1069,7 +1077,11 @@
         name.textContent = entry.name;
         name.title = entry.name;
         if (entry.isDir) {
-          name.addEventListener("click", () => openFiles(entry.path));
+          if (settings.dblClickNavigate) {
+            name.addEventListener("dblclick", () => openFiles(entry.path));
+          } else {
+            name.addEventListener("click", () => openFiles(entry.path));
+          }
         }
         const meta = document.createElement("span");
         meta.className = "file-meta";
@@ -1541,6 +1553,11 @@
       setFontSizeInput.addEventListener("input", () => {
         const value = parseFloat(setFontSizeInput.value);
         if (!isNaN(value)) { settings.fontSize = value; saveSettings(); }
+      });
+      setDblClick.addEventListener("change", () => {
+        settings.dblClickNavigate = setDblClick.checked;
+        saveSettings();
+        if (filePanelOpen && lastEntries) renderFiles(lastEntries);
       });
       setDownloadDirInput.addEventListener("change", () => {
         const value = setDownloadDirInput.value.trim();
