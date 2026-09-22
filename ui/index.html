@@ -155,6 +155,7 @@
         <input id="filePathInput" placeholder="/" aria-label="remote path" />
         <button id="btnGo" type="button"></button>
         <button id="btnRefresh" type="button"></button>
+        <button id="btnJump" type="button" hidden title=""></button>
         <button id="btnFollow" type="button" hidden title=""></button>
         <button id="btnMkdir" type="button"></button>
         <button id="btnUpload" type="button"></button>
@@ -222,7 +223,7 @@
       const btnClear = $("btnClear"), btnCancel = $("btnCancel");
       const ptyHost = $("ptyHost");
       const btnSettings = $("btnSettings"), settingsPanel = $("settingsPanel");
-      const btnFollow = $("btnFollow"), setFontSizeInput = $("setFontSize");
+      const btnFollow = $("btnFollow"), btnJump = $("btnJump"), setFontSizeInput = $("setFontSize");
       const setFontSizeVal = $("setFontSizeVal");
       const filePanel = $("filePanel"), filePathInput = $("filePathInput"), fileLog = $("fileLog");
       const logTitle = $("logTitle"), logWrap = $("logWrap"), logHead = $("logHead");
@@ -253,6 +254,8 @@
           ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
           legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
           setPanelTitle: "Settings",
+          jumpBtn: "→ Shell",
+          jumpTip: "Make the SSH shell cd to this directory",
           followOn: "Follow · on",
           followOff: "Follow · off",
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
@@ -299,6 +302,8 @@
           ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
           legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
           setPanelTitle: "设置",
+          jumpBtn: "跳到终端",
+          jumpTip: "让 SSH 终端跳转到当前文件目录",
           followOn: "联动 · 开",
           followOff: "联动 · 关",
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
@@ -406,6 +411,8 @@
         btnUpload.textContent = text.upload;
         setPanelTitle.textContent = text.setPanelTitle;
         updateFollowButton();
+        btnJump.textContent = text.jumpBtn;
+        btnJump.title = text.jumpTip;
         setFontSizeLabel.textContent = text.setFontSize;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
@@ -651,6 +658,7 @@
           try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.sftpFollowCwd }).catch(() => {}); } catch (_) {}
           // 文件侧边栏走 SFTP，只有 SSH 会话可用；SSH 默认展开并联动
           btnFiles.hidden = sessionKind !== "ssh";
+          btnJump.hidden = sessionKind !== "ssh";
           btnFollow.hidden = sessionKind !== "ssh";
           filePanelOpen = sessionKind === "ssh";
           if (info.pty || sessionKind === "ssh") {
@@ -1510,6 +1518,14 @@
         settingsPanel.hidden = !settingsPanel.hidden;
         if (!settingsPanel.hidden) syncSettingsInputs();
       });
+      btnJump.addEventListener("click", () => {
+        if (!ptyMode || !remoteCwd) return;
+        // POSIX single-quote escaping: ' → '''
+        const quoted = "'" + remoteCwd.replace(/'/g, `'\\''`) + "'";
+        const bytes = new TextEncoder().encode("cd " + quoted + "\r");
+        window.dbxPlugin.invoke("shell/input", { connectionId, data: bytesToBase64(bytes) }).catch(() => {});
+      });
+
       btnFollow.addEventListener("click", () => {
         settings.sftpFollowCwd = !settings.sftpFollowCwd;
         saveSettings();
