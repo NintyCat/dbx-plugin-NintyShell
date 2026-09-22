@@ -256,9 +256,9 @@
           legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
           setPanelTitle: "Settings",
           setFollow: "File panel follows the terminal path",
-          setInject: "Inject cwd reporting into remote SSH shells (opt-in)",
+          setInject: "Inject cwd reporting into remote SSH shells",
           setFontSize: "Terminal font size",
-          setNote: "Path following uses the OSC 7 shell report; local bash/zsh/PowerShell get it automatically, remote shells need the injection option above.",
+          setNote: "Path following uses the OSC 7 shell report: automatic for local bash/zsh/PowerShell and for remote SSH (injection is on by default).",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -302,9 +302,9 @@
           legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
           setPanelTitle: "设置",
           setFollow: "文件面板跟随终端路径联动",
-          setInject: "向远程 SSH shell 注入路径上报（默认关闭）",
+          setInject: "向远程 SSH shell 注入路径上报",
           setFontSize: "终端字号",
-          setNote: "路径联动依赖 shell 的 OSC 7 上报：本地 bash/zsh/PowerShell 自动启用，远程 shell 需开启上方注入选项。",
+          setNote: "路径联动依赖 shell 的 OSC 7 上报：本地 bash/zsh/PowerShell 与远程 SSH（自动注入）默认启用，不需要远程机器做任何配置。",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -365,7 +365,7 @@
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
       // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
-      const settingsDefaults = { sftpFollowCwd: true, injectOsc7: false, fontSize: 12.5 };
+      const settingsDefaults = { sftpFollowCwd: true, injectOsc7: true, fontSize: 12.5 };
       let settings = loadSettings();
       function loadSettings() {
         try {
