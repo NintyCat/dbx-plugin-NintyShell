@@ -37,6 +37,7 @@
       .set-row { display: flex; align-items: center; gap: 8px; line-height: 1.4; }
       .set-row span { flex: 1; }
       .set-row input[type="range"] { flex: 1; }
+      #setDownloadDir { flex: 1.4; min-width: 0; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 4px 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
       .set-note { font-size: 11px; opacity: .6; }
       button { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 12px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
       button:hover:not(:disabled) { background: color-mix(in srgb, CanvasText 7%, transparent); }
@@ -64,7 +65,6 @@
       .file-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
       .file-toolbar input { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 10px; background: transparent; color: inherit; font: inherit; font-size: 12px; }
       #filePathInput { flex: 1; min-width: 160px; font-family: ui-monospace, Menlo, monospace; }
-      #localDirInput { width: 180px; }
       #fileTable { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid color-mix(in srgb, CanvasText 12%, transparent); border-radius: 10px; }
       .file-row { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-bottom: 1px solid color-mix(in srgb, CanvasText 7%, transparent); }
       .file-row:hover { background: color-mix(in srgb, CanvasText 5%, transparent); }
@@ -136,6 +136,7 @@
     <div id="settingsPanel" hidden>
       <div class="set-title" id="setPanelTitle"></div>
       <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
+      <div class="set-row"><span id="setDownloadDirLabel"></span><input type="text" id="setDownloadDir" spellcheck="false"></div>
     </div>
     <div id="contentRow">
       <main id="ptyHost" hidden></main>
@@ -159,7 +160,6 @@
         <button id="btnFollow" type="button" hidden title=""></button>
         <button id="btnMkdir" type="button"></button>
         <button id="btnUpload" type="button"></button>
-        <input id="localDirInput" placeholder="~/Downloads" aria-label="local download directory" />
       </div>
       <div id="fileTable"></div>
       <div class="file-status" id="fileStatus"></div>
@@ -229,7 +229,8 @@
       const logTitle = $("logTitle"), logWrap = $("logWrap"), logHead = $("logHead");
       const logCount = $("logCount"), logClear = $("logClear");
       const btnGo = $("btnGo"), btnRefresh = $("btnRefresh"), btnMkdir = $("btnMkdir"), btnUpload = $("btnUpload");
-      const localDirInput = $("localDirInput"), fileTable = $("fileTable"), fileStatus = $("fileStatus");
+      const fileTable = $("fileTable"), fileStatus = $("fileStatus");
+      const setDownloadDirInput = $("setDownloadDir");
       const uploadInput = $("uploadInput");
       const modal = $("modal"), modalTitle = $("modalTitle"), modalInput = $("modalInput");
       const modalOk = $("modalOk"), modalCancel = $("modalCancel");
@@ -260,6 +261,7 @@
           followOff: "Follow · off",
           followTip: "Follow the terminal path (also injects the cwd reporter into remote shells)",
           setFontSize: "Terminal font size",
+          setDownloadDir: "Download directory",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -308,6 +310,7 @@
           followOff: "联动 · 关",
           followTip: "跟随终端路径联动（同时向远程 shell 注入路径上报）",
           setFontSize: "终端字号",
+          setDownloadDir: "下载目录",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -368,7 +371,7 @@
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
       // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
-      const settingsDefaults = { sftpFollowCwd: true, fontSize: 12.5 };
+      const settingsDefaults = { sftpFollowCwd: true, fontSize: 12.5, downloadDir: "~/Downloads" };
       let settings = loadSettings();
       function loadSettings() {
         try {
@@ -395,6 +398,7 @@
 
       function syncSettingsInputs() {
         setFontSizeInput.value = settings.fontSize;
+        setDownloadDirInput.value = settings.downloadDir || "~/Downloads";
         updateFollowButton();
       }
 
@@ -414,6 +418,7 @@
         btnJump.textContent = text.jumpBtn;
         btnJump.title = text.jumpTip;
         setFontSizeLabel.textContent = text.setFontSize;
+        setDownloadDirLabel.textContent = text.setDownloadDir;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
         if (!running) badge.textContent = dot.className.includes("err") ? text.disconnected : text.ready;
@@ -1106,7 +1111,7 @@
           const result = await window.dbxPlugin.invoke("sftp/download", {
             connectionId,
             path: entry.path,
-            localDir: localDirInput.value || "~/Downloads",
+            localDir: settings.downloadDir || "~/Downloads",
           });
           fileStatusLine(text.downloaded(result.localPath || ""));
           logEntry(text.logDownloadDone(result.localPath || ""), "ok");
@@ -1536,6 +1541,12 @@
       setFontSizeInput.addEventListener("input", () => {
         const value = parseFloat(setFontSizeInput.value);
         if (!isNaN(value)) { settings.fontSize = value; saveSettings(); }
+      });
+      setDownloadDirInput.addEventListener("change", () => {
+        const value = setDownloadDirInput.value.trim();
+        settings.downloadDir = value || "~/Downloads";
+        setDownloadDirInput.value = settings.downloadDir;
+        saveSettings();
       });
 
       btnClear.addEventListener("click", () => {
