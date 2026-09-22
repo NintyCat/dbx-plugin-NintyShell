@@ -42,6 +42,9 @@ func (l *localPTY) Resize(cols, rows uint16) error {
 	return pty.Setsize(l.file, &pty.Winsize{Cols: cols, Rows: rows})
 }
 
+// supplementWindowsEnv is a no-op outside Windows; see localpty_windows.go.
+func supplementWindowsEnv(env []string) []string { return env }
+
 // Close hangs up the controlling terminal so the shell exits on its own and
 // reaps it shortly after; closing the file also unblocks the plugin's read
 // loop.

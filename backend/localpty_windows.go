@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,12 +12,47 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 // errConPtyUnsupported is returned on Windows releases older than 10 1809,
 // where the ConPTY APIs are missing; connectLocal falls back to per-command
 // exec mode.
 var errConPtyUnsupported = errors.New("ConPTY is not available on this version of Windows")
+
+// supplementWindowsEnv restores variables that console hosts (PowerShell,
+// cmd) require for DLL initialization but that a sandboxed sidecar
+// environment may have lost. Without SystemRoot, powershell.exe fails with
+// STATUS_DLL_INIT_FAILED (0xC0000142) before writing a single byte of
+// output.
+func supplementWindowsEnv(env []string) []string {
+	have := make(map[string]bool, len(env))
+	for _, entry := range env {
+		if name, _, found := strings.Cut(entry, "="); found {
+			have[strings.ToUpper(name)] = true
+		}
+	}
+	if have["SYSTEMROOT"] {
+		return env
+	}
+	root := os.Getenv("SystemRoot")
+	if root == "" {
+		root = os.Getenv("windir")
+	}
+	if root == "" {
+		if key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE); err == nil {
+			if value, _, regErr := key.GetStringValue("SystemRoot"); regErr == nil && value != "" {
+				root = value
+			}
+			key.Close()
+		}
+	}
+	if root == "" {
+		root = `C:\Windows`
+	}
+	ptyLogf("sidecar env lacks SystemRoot; supplementing %q", root)
+	return append(env, "SystemRoot="+root)
+}
 
 // localPTY is an interactive local shell attached to a Windows pseudo console
 // (ConPTY). Reads return the shell's VT rendered output, writes feed its

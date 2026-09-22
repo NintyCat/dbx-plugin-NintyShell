@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -47,7 +48,11 @@ func localPTYEnv() []string {
 		}
 		env = append(env, entry)
 	}
-	return append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
+	env = append(env, "TERM=xterm-256color", "COLORTERM=truecolor")
+	if runtime.GOOS == "windows" {
+		env = supplementWindowsEnv(env)
+	}
+	return env
 }
 
 // ptyLogf appends a line to pty.log next to the panic log. Unlike a Unix
