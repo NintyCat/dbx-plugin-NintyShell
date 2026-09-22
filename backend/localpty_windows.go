@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -54,23 +55,25 @@ func supplementWindowsEnv(env []string) []string {
 	return append(env, "SystemRoot="+root)
 }
 
-// localPTY is an interactive local shell attached to a Windows pseudo console
-// (ConPTY). Reads return the shell's VT rendered output, writes feed its
-// keyboard. The process-attachment sequence follows
-// github.com/UserExistsError/conpty (MIT), built directly on x/sys/windows.
-type localPTY struct {
-	con     windows.Handle
-	ptyIn   windows.Handle // pseudoconsole end of the input pipe
-	ptyOut  windows.Handle // pseudoconsole end of the output pipe
-	cmdIn   windows.Handle // shell keyboard (we write)
-	cmdOut  windows.Handle // shell output (we read)
-	process windows.Handle
-	thread  windows.Handle
-	attrs   *windows.ProcThreadAttributeListContainer
-	once    sync.Once
+// conptyProc is a raw pseudo console with an attached process. The caller
+// owns the lifecycle: closeConsole() terminates the shell and unblocks the
+// output pipe, release() frees every handle.
+type conptyProc struct {
+	con           windows.Handle
+	ptyIn         windows.Handle // pseudoconsole end of the input pipe
+	ptyOut        windows.Handle // pseudoconsole end of the output pipe
+	cmdIn         windows.Handle // shell keyboard (we write)
+	cmdOut        windows.Handle // shell output (we read)
+	process       windows.Handle
+	thread        windows.Handle
+	attrs         *windows.ProcThreadAttributeListContainer
+	consoleClosed bool
 }
 
-func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) {
+// spawnConPTY attaches argv to a new pseudo console. The process-attachment
+// sequence follows github.com/UserExistsError/conpty (MIT), built directly
+// on x/sys/windows.
+func spawnConPTY(argv []string, dir string, cols, rows uint16, env []string, useStdHandles bool) (*conptyProc, error) {
 	var ptyIn, ptyOut, cmdIn, cmdOut windows.Handle
 	if err := windows.CreatePipe(&ptyIn, &cmdIn, nil, 0); err != nil {
 		return nil, err
@@ -87,50 +90,51 @@ func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) 
 
 	attrs, err := windows.NewProcThreadAttributeList(1)
 	if err != nil {
-		windows.ClosePseudoConsole(con)
-		closeHandles(ptyIn, ptyOut, cmdIn, cmdOut)
+		closeConsoleAndPipes(con, ptyIn, ptyOut, cmdIn, cmdOut)
 		return nil, err
 	}
 	if err := attrs.Update(windows.PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE, unsafe.Pointer(&con), unsafe.Sizeof(con)); err != nil {
 		attrs.Delete()
-		windows.ClosePseudoConsole(con)
-		closeHandles(ptyIn, ptyOut, cmdIn, cmdOut)
+		closeConsoleAndPipes(con, ptyIn, ptyOut, cmdIn, cmdOut)
 		return nil, err
 	}
 
-	commandLine, err := windows.UTF16PtrFromString(windowsCommandLine(localPTYArgv(shellPath)))
+	commandLine, err := windows.UTF16PtrFromString(windowsCommandLine(argv))
 	if err != nil {
 		attrs.Delete()
-		windows.ClosePseudoConsole(con)
-		closeHandles(ptyIn, ptyOut, cmdIn, cmdOut)
+		closeConsoleAndPipes(con, ptyIn, ptyOut, cmdIn, cmdOut)
 		return nil, err
 	}
 	var dirPtr *uint16
 	if dir != "" {
 		if dirPtr, err = windows.UTF16PtrFromString(dir); err != nil {
 			attrs.Delete()
-			windows.ClosePseudoConsole(con)
-			closeHandles(ptyIn, ptyOut, cmdIn, cmdOut)
+			closeConsoleAndPipes(con, ptyIn, ptyOut, cmdIn, cmdOut)
 			return nil, err
 		}
 	}
 
 	si := &windows.StartupInfoEx{}
 	si.Cb = uint32(unsafe.Sizeof(*si))
-	si.Flags = windows.STARTF_USESTDHANDLES
+	if useStdHandles {
+		si.Flags = windows.STARTF_USESTDHANDLES
+	}
 	si.ProcThreadAttributeList = attrs.List()
 	pi := &windows.ProcessInformation{}
-	envBlock := envBlockUTF16(localPTYEnv())
+	var envBlock *uint16
+	creationFlags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT)
+	if env != nil {
+		creationFlags |= windows.CREATE_UNICODE_ENVIRONMENT
+		envBlock = envBlockUTF16(env)
+	}
 	if err := windows.CreateProcess(nil, commandLine, nil, nil, false,
-		windows.EXTENDED_STARTUPINFO_PRESENT|windows.CREATE_UNICODE_ENVIRONMENT,
-		envBlock, dirPtr, &si.StartupInfo, pi); err != nil {
+		creationFlags, envBlock, dirPtr, &si.StartupInfo, pi); err != nil {
 		attrs.Delete()
-		windows.ClosePseudoConsole(con)
-		closeHandles(ptyIn, ptyOut, cmdIn, cmdOut)
+		closeConsoleAndPipes(con, ptyIn, ptyOut, cmdIn, cmdOut)
 		return nil, err
 	}
 
-	pty := &localPTY{
+	return &conptyProc{
 		con:     con,
 		ptyIn:   ptyIn,
 		ptyOut:  ptyOut,
@@ -139,54 +143,47 @@ func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) 
 		process: pi.Process,
 		thread:  pi.Thread,
 		attrs:   attrs,
+	}, nil
+}
+
+func closeConsoleAndPipes(con windows.Handle, pipes ...windows.Handle) {
+	windows.ClosePseudoConsole(con)
+	closeHandles(pipes...)
+}
+
+func (c *conptyProc) Read(p []byte) (int, error) {
+	var n uint32
+	err := windows.ReadFile(c.cmdOut, p, &n, nil)
+	return int(n), err
+}
+
+func (c *conptyProc) Write(p []byte) (int, error) {
+	var n uint32
+	err := windows.WriteFile(c.cmdIn, p, &n, nil)
+	return int(n), err
+}
+
+func (c *conptyProc) Resize(cols, rows uint16) error {
+	return windows.ResizePseudoConsole(c.con, windows.Coord{X: int16(cols), Y: int16(rows)})
+}
+
+// closeConsole shuts the pseudo console down, which terminates the attached
+// shell and makes the output pipe report EOF.
+func (c *conptyProc) closeConsole() {
+	if c.consoleClosed {
+		return
 	}
-	pty.watchExit()
-	return pty, nil
+	c.consoleClosed = true
+	windows.ClosePseudoConsole(c.con)
 }
 
-// watchExit closes the pseudo console once the shell process exits. Unlike a
-// Unix pty, the ConPTY pipes never report EOF on their own, so a shell that
-// dies on startup (or after typing exit) would otherwise leave the terminal
-// frozen on a blank screen forever. The short drain delay lets the console
-// flush its final VT output before the pipes go away.
-func (l *localPTY) watchExit() {
-	go func() {
-		_, _ = windows.WaitForSingleObject(l.process, windows.INFINITE)
-		var code uint32
-		_ = windows.GetExitCodeProcess(l.process, &code)
-		ptyLogf("shell process exited, code=%d", code)
-		time.Sleep(400 * time.Millisecond)
-		_ = l.Close()
-	}()
-}
-func (l *localPTY) Read(p []byte) (int, error) {
-	var n uint32
-	err := windows.ReadFile(l.cmdOut, p, &n, nil)
-	return int(n), err
-}
-
-func (l *localPTY) Write(p []byte) (int, error) {
-	var n uint32
-	err := windows.WriteFile(l.cmdIn, p, &n, nil)
-	return int(n), err
-}
-
-func (l *localPTY) Resize(cols, rows uint16) error {
-	return windows.ResizePseudoConsole(l.con, windows.Coord{X: int16(cols), Y: int16(rows)})
-}
-
-// Close tears down the pseudo console, which terminates the attached shell,
-// and releases every handle.
-func (l *localPTY) Close() error {
-	var err error
-	l.once.Do(func() {
-		windows.ClosePseudoConsole(l.con)
-		l.attrs.Delete()
-		windows.CloseHandle(l.process)
-		windows.CloseHandle(l.thread)
-		err = closeHandles(l.ptyIn, l.ptyOut, l.cmdIn, l.cmdOut)
-	})
-	return err
+// release tears down the pseudo console and frees every handle.
+func (c *conptyProc) release() error {
+	c.closeConsole()
+	if c.attrs != nil {
+		c.attrs.Delete()
+	}
+	return closeHandles(c.process, c.thread, c.ptyIn, c.ptyOut, c.cmdIn, c.cmdOut)
 }
 
 func closeHandles(handles ...windows.Handle) error {
@@ -249,4 +246,61 @@ func windowsCommandLine(argv []string) string {
 		quoted[i] = b.String()
 	}
 	return strings.Join(quoted, " ")
+}
+
+// localPTY is an interactive local shell attached to a Windows pseudo
+// console (ConPTY). Reads return the shell's VT rendered output, writes feed
+// its keyboard.
+type localPTY struct {
+	*conptyProc
+	shellPath string
+	dir       string
+	startedAt time.Time
+	once      sync.Once
+}
+
+func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) {
+	c, err := spawnConPTY(localPTYArgv(shellPath), dir, cols, rows, localPTYEnv(), true)
+	if err != nil {
+		return nil, err
+	}
+	pty := &localPTY{conptyProc: c, shellPath: shellPath, dir: dir, startedAt: time.Now()}
+	pty.watchExit()
+	return pty, nil
+}
+
+// watchExit closes the pseudo console once the shell process exits. Unlike a
+// Unix pty, the ConPTY pipes never report EOF on their own, so a shell that
+// dies on startup (or after typing exit) would otherwise leave the terminal
+// frozen on a blank screen forever. The short drain delay lets the console
+// flush its final VT output before the pipes go away. A shell that dies
+// within seconds of start also triggers the automatic failure probes in
+// ptydiag_windows.go.
+func (l *localPTY) watchExit() {
+	go func() {
+		_, _ = windows.WaitForSingleObject(l.process, windows.INFINITE)
+		var code uint32
+		_ = windows.GetExitCodeProcess(l.process, &code)
+		ptyLogf("shell process exited, code=%d (0x%08X)", code, code)
+		if code != 0 && time.Since(l.startedAt) < 3*time.Second {
+			diagnoseConPTYFailure(l.shellPath, l.dir, code)
+		}
+		time.Sleep(400 * time.Millisecond)
+		_ = l.Close()
+	}()
+}
+
+func (l *localPTY) Close() error {
+	var err error
+	l.once.Do(func() { err = l.release() })
+	return err
+}
+
+// fmtExit renders a wait result for the logs: an NTSTATUS code is far more
+// readable in hex (0xC0000142 = STATUS_DLL_INIT_FAILED).
+func fmtExit(code uint32, alive bool, waited time.Duration) string {
+	if alive {
+		return fmt.Sprintf("alive after %s", waited)
+	}
+	return fmt.Sprintf("exit %d (0x%08X)", code, code)
 }

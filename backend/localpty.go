@@ -86,7 +86,7 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 		ptyLogf("start failed shell=%q: %v", s.shellPath, err)
 		return err
 	}
-	ptyLogf("started shell=%q dir=%q", s.shellPath, s.cwd)
+	ptyLogf("started v%s shell=%q dir=%q", pluginVersion, s.shellPath, s.cwd)
 	s.localPty = pty
 	sessionID := s.id
 	go func() {
