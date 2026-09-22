@@ -32,7 +32,21 @@ func diagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
 	})
 }
 
+// diagnoseSilentSession runs the same probes for a session that never
+// produced output at all — the signature of the pseudoconsole attribute not
+// being applied (the child then opens its own console window and every byte
+// goes there instead of our pipe).
+func (l *localPTY) noteSilentExit() {
+	diagOnce.Do(func() {
+		runDiagnoseConPTYFailure(l.shellPath, l.dir, 0)
+	})
+}
+
 func runDiagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
+	vi := windows.RtlGetVersion()
+	ptyLogf("diag: windows %d.%d build %d | sizeof STARTUPINFO=%d STARTUPINFOEX=%d",
+		vi.MajorVersion, vi.MinorVersion, vi.BuildNumber,
+		unsafe.Sizeof(windows.StartupInfo{}), unsafe.Sizeof(windows.StartupInfoEx{}))
 	ptyLogf("diag: probes for exit %d (0x%08X)", exitCode, exitCode)
 	argv := localPTYArgv(shellPath)
 	ours := localPTYEnv()

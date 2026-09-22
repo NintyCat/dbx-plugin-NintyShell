@@ -45,6 +45,9 @@ func (l *localPTY) Resize(cols, rows uint16) error {
 // supplementWindowsEnv is a no-op outside Windows; see localpty_windows.go.
 func supplementWindowsEnv(env []string) []string { return env }
 
+// noteSilentExit is a no-op outside Windows; see ptydiag_windows.go.
+func (l *localPTY) noteSilentExit() {}
+
 // Close hangs up the controlling terminal so the shell exits on its own and
 // reaps it shortly after; closing the file also unblocks the plugin's read
 // loop.

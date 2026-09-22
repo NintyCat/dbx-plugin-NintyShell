@@ -109,6 +109,13 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 			}
 			if readErr != nil {
 				ptyLogf("read ended: %v (got output=%v)", readErr, !firstOutput)
+				if firstOutput {
+					// A session that never produced a single byte is the
+					// signature of the pseudoconsole attribute not being
+					// applied (the child spawns its own console window) or
+					// the console never rendering; run the probes.
+					pty.noteSilentExit()
+				}
 				s.mutex.Lock()
 				stopping := s.stopping
 				if !stopping {
