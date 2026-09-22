@@ -7,7 +7,7 @@
   "source": "https://github.com/NintyCat/dbx-plugin-NintyShell",
   "homepage": "https://github.com/NintyCat/dbx-plugin-NintyShell",
   "license": "MIT",
-  "releaseNotes": "Windows support for the Local Shell connection (auto-selected powershell.exe, command wrapper with exit-code and working-directory reporting) and platform-aware shell defaults; panic log moved from /tmp to the user cache directory with tightened permissions; collapsible activity log in the file panel.",
+  "releaseNotes": "Windows SSH linkage fix: cwd reports (OSC 7) from the remote shell were parsed with the client's Windows path rules and silently dropped, so the file panel never followed the terminal and remote path completion stayed in the home directory; SSH sessions now parse remote paths as POSIX. Windows Local Shell PTY fix: the local terminal now uses the go-pty ConPTY implementation, resolving black-screen/silent sessions that fell back to per-command mode on Windows 11 25H2; silent sessions now run automatic diagnostics into pty.log. Also includes Windows support for the Local Shell connection (auto-selected powershell.exe, command wrapper with exit-code and working-directory reporting) and platform-aware shell defaults; panic log moved from /tmp to the user cache directory with tightened permissions; collapsible activity log in the file panel.",
   "localizations": {
     "zh-CN": {
       "name": "NintyShell",

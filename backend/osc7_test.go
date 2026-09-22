@@ -1,6 +1,49 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
+)
+
+// cwdRecorder captures shell/cwd-changed notifications for assertions.
+type cwdRecorder struct {
+	methods []string
+	params  []map[string]any
+}
+
+func (r *cwdRecorder) Event(method string, params any) *dbxpluginsdk.PluginError {
+	r.methods = append(r.methods, method)
+	if record, ok := params.(map[string]any); ok {
+		r.params = append(r.params, record)
+	}
+	return nil
+}
+
+// A Windows client must still accept the POSIX cwd reports of an SSH remote
+// shell. Parsing them with runtime.GOOS used to drop every /home/... path,
+// which silently disabled the terminal → file-panel follow on Windows.
+func TestEmitOsc7CwdSSHKeepsRemotePath(t *testing.T) {
+	s := &shellSession{id: "conn-1", kind: "ssh", cwd: "/home/u"}
+	rec := &cwdRecorder{}
+
+	emitOsc7Cwd(s, rec, "file://host/home/u/proj")
+	if s.cwd != "/home/u/proj" {
+		t.Fatalf("session cwd = %q, want %q", s.cwd, "/home/u/proj")
+	}
+	if len(rec.methods) != 1 || rec.methods[0] != "shell/cwd-changed" {
+		t.Fatalf("events = %v, want one shell/cwd-changed", rec.methods)
+	}
+	if rec.params[0]["cwd"] != "/home/u/proj" || rec.params[0]["connectionId"] != "conn-1" {
+		t.Fatalf("event params = %v, want cwd=/home/u/proj connectionId=conn-1", rec.params[0])
+	}
+
+	// An unchanged path must not re-notify the UI (follow loop guard).
+	emitOsc7Cwd(s, rec, "file://host/home/u/proj")
+	if len(rec.methods) != 1 {
+		t.Fatalf("duplicate event for unchanged cwd: %v", rec.methods)
+	}
+}
 
 func TestOsc7Scanner(t *testing.T) {
 	s := &osc7Scanner{}

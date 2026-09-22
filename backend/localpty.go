@@ -133,7 +133,16 @@ func osc7URIToPath(uri, goos string) string {
 // emitOsc7Cwd updates the session cwd from an OSC 7 report and notifies the
 // UI when it actually changed.
 func emitOsc7Cwd(s *shellSession, emitter eventEmitter, uri string) {
-	cwd := osc7URIToPath(uri, runtime.GOOS)
+	// An SSH session reports the remote shell's POSIX paths, which must not
+	// be parsed with the client's GOOS: on a Windows client every /home/...
+	// report used to come back empty and the file panel never followed the
+	// terminal. Local sessions keep runtime.GOOS (PowerShell emits
+	// file:///C:/... there).
+	goos := runtime.GOOS
+	if s.kind == "ssh" {
+		goos = "linux"
+	}
+	cwd := osc7URIToPath(uri, goos)
 	if cwd == "" {
 		return
 	}

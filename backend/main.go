@@ -435,6 +435,10 @@ func (p *plugin) fallbackSession(s *shellSession, emitter eventEmitter) {
 	_ = pty.Close()
 	_ = emitter.Event("shell/legacy-fallback", map[string]any{"connectionId": s.id})
 	ptyLogf("session fell back to per-command mode")
+	// A silent session is the failure mode the ConPTY probes exist for.
+	// Run them off the fallback path so the multi-second probe sleeps never
+	// delay the UI switch. No-op outside Windows; at most once per process.
+	go pty.noteSilentExit()
 }
 
 func (p *plugin) disconnect(values map[string]any) (any, *dbxpluginsdk.PluginError) {
@@ -1251,7 +1255,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.8.0"
+	pluginVersion = "0.8.2"
 )
 
 func main() {

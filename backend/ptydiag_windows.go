@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 	"strings"
 	"sync"
@@ -11,18 +12,18 @@ import (
 	"time"
 	"unsafe"
 
+	gopt "github.com/aymanbagabas/go-pty"
 	"golang.org/x/sys/windows"
 )
 
 // diagnoseConPTYFailure runs controlled probes inside the sidecar's own
 // process and environment when a PTY shell dies within seconds of start, and
 // writes the results to pty.log. The probes isolate the failing layer:
-//   - plain CreateProcess (no pseudo console) with the inherited environment
-//     vs. ours: does the shell die even without ConPTY? (env/session issue)
-//   - ConPTY with the inherited environment vs. ours: is our env block bad?
-//   - ConPTY without STARTF_USESTDHANDLES: is the startup-info flag the
-//     trigger on this Windows build?
-//   - ConPTY with cmd.exe: is conhost itself broken?
+//   - go-pty with our environment vs. inherited: does a fresh ConPTY
+//     session produce bytes at all? (spawn path broken vs. env broken)
+//   - go-pty with cmd.exe: is conhost itself broken?
+//   - plain CreateProcess (no pseudo console): is it the session/token
+//     rather than ConPTY?
 //
 // Runs at most once per sidecar process.
 var diagOnce sync.Once
@@ -33,10 +34,9 @@ func diagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
 	})
 }
 
-// diagnoseSilentSession runs the same probes for a session that never
-// produced output at all — the signature of the pseudoconsole attribute not
-// being applied (the child then opens its own console window and every byte
-// goes there instead of our pipe).
+// noteSilentExit runs the same probes for a session that never produced
+// output at all — the signature of the child never attaching to the
+// pseudoconsole (every byte then goes to a console we never read).
 func (l *localPTY) noteSilentExit() {
 	diagOnce.Do(func() {
 		runDiagnoseConPTYFailure(l.shellPath, l.dir, 0)
@@ -47,163 +47,44 @@ func runDiagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
 	_ = rtlGetVersionForLog()
 	argv := localPTYArgv(shellPath)
 	ours := localPTYEnv()
+	ptyLogf("diag: failing shell exit=%d (0x%08X)", exitCode, exitCode)
 
-	// Decisive first: close the pseudo console 0.8s after spawn - if the
-	// child survives, it was never attached (own console) and every output
-	// byte went there instead of our pipe.
-	attachedProbe(argv, dir, ours, "attach-test powershell env=ours")
-
-	code, alive := spawnPlainWait(argv, dir, nil)
-	ptyLogf("diag: plain powershell env=inherit -> %s", fmtExit(code, alive, 2*time.Second))
-	code, alive = spawnPlainWait(argv, dir, ours)
-	ptyLogf("diag: plain powershell env=ours -> %s", fmtExit(code, alive, 2*time.Second))
-
-	liveProbe(argv, dir, ours, "live powershell env=ours")
-	conptyProbe(argv, dir, nil, false, "conpty powershell env=inherit")
+	conptyProbe(argv, dir, ours, "go-pty shell env=ours")
+	conptyProbe(argv, dir, nil, "go-pty shell env=inherit")
 	if cmd, err := exec.LookPath("cmd.exe"); err == nil {
-		conptyProbe([]string{cmd, "/c", "echo diag_ok"}, dir, nil, false, "conpty cmd /c echo env=inherit")
+		conptyProbe([]string{cmd, "/c", "echo diag_ok"}, dir, nil, "go-pty cmd /c echo")
 	}
+
+	code, alive := spawnPlainWait(argv, dir, ours)
+	ptyLogf("diag: plain shell env=ours -> %s", fmtExit(code, alive, 2*time.Second))
 	ptyLogf("diag: probes done")
 }
 
-// liveProbe inspects a running pseudo console child: which visible windows
-// belong to it, does typing into the console come back through the output
-// pipe, and does closing the console kill it.
-func liveProbe(argv []string, dir string, env []string, label string) {
-	c, err := spawnConPTY(argv, dir, 80, 24, env, false)
-	if err != nil {
-		ptyLogf("diag: %s -> spawn err %v", label, err)
-		return
-	}
-	var mu sync.Mutex
-	var all []byte
-	stop := make(chan struct{})
-	go func() {
-		buf := make([]byte, 4096)
-		for {
-			n, err := c.Read(buf)
-			if n > 0 {
-				mu.Lock()
-				all = append(all, buf[:n]...)
-				mu.Unlock()
-			}
-			if err != nil {
-				close(stop)
-				return
-			}
-		}
-	}()
-	time.Sleep(1200 * time.Millisecond)
-	childWindows := visibleWindowsOf(c.Pid())
-	time.Sleep(300 * time.Millisecond)
-
-	const marker = "mark_7f3d"
-	_, _ = c.Write([]byte("echo " + marker + "\r"))
-	time.Sleep(1500 * time.Millisecond)
-
-	mu.Lock()
-	echoed := strings.Contains(string(all), marker)
-	output := append([]byte(nil), all...)
-	mu.Unlock()
-
-	time.Sleep(300 * time.Millisecond)
-	c.closeConsole()
-	event, _ := windows.WaitForSingleObject(c.process, 1500)
-	stillAlive := uint32(event) == uint32(windows.WAIT_TIMEOUT)
-	var code uint32
-	_ = windows.GetExitCodeProcess(c.process, &code)
-	_ = c.release()
-
-	ptyLogf("diag: %s -> child pid %d visible-windows=%v echoed-marker=%v bytes=%d%s attach-close-kills=%v final %s",
-		label, c.Pid(), childWindows, echoed, len(output), previewSuffix(output), !stillAlive, fmtExit(code, stillAlive, 0))
-}
-
-// visibleWindowsOf lists the window classes of all visible top-level
-// windows that belong to pid. A pseudo console child is headless, so any
-// hit means the PSEUDOCONSOLE attribute was ignored and the child opened
-// its own (delegated) console.
-func visibleWindowsOf(pid uint32) []string {
-	var (
-		mu    sync.Mutex
-		found []string
-	)
-	callback := syscall.NewCallback(func(hwnd windows.HWND, lparam unsafe.Pointer) uintptr {
-		if !windows.IsWindowVisible(hwnd) {
-			return 1
-		}
-		var owner uint32
-		_, _ = windows.GetWindowThreadProcessId(hwnd, &owner)
-		if owner == pid {
-			mu.Lock()
-			found = append(found, windowClass(hwnd))
-			mu.Unlock()
-		}
-		return 1
-	})
-	_ = windows.EnumWindows(callback, nil)
-	return found
-}
-
-var user32DLL = windows.NewLazySystemDLL("user32.dll")
-var procGetClassNameW = user32DLL.NewProc("GetClassNameW")
-
-func windowClass(hwnd windows.HWND) string {
-	buf := make([]uint16, 256)
-	n, _, _ := procGetClassNameW.Call(uintptr(hwnd), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
-	if n == 0 {
-		return "?"
-	}
-	return windows.UTF16ToString(buf[:int(n)])
-}
-
-// rtlGetVersionForLog records the Windows build the sidecar runs on so
-// ConPTY behavior can be correlated with the OS version.
-func rtlGetVersionForLog() error {
-	vi := windows.RtlGetVersion()
-	ptyLogf("diag: windows %d.%d build %d | sizeof STARTUPINFO=%d STARTUPINFOEX=%d",
-		vi.MajorVersion, vi.MinorVersion, vi.BuildNumber,
-		unsafe.Sizeof(windows.StartupInfo{}), unsafe.Sizeof(windows.StartupInfoEx{}))
-	return nil
-}
-
-// attachedProbe closes the pseudo console shortly after spawn and reports
-// whether the child died with it. Surviving the close means the
-// PSEUDOCONSOLE attribute never reached the child.
-func attachedProbe(argv []string, dir string, env []string, label string) {
-	c, err := spawnConPTY(argv, dir, 80, 24, env, false)
-	if err != nil {
-		ptyLogf("diag: %s -> spawn err %v", label, err)
-		return
-	}
-	time.Sleep(800 * time.Millisecond)
-	c.closeConsole()
-	event, _ := windows.WaitForSingleObject(c.process, 1500)
-	stillAlive := uint32(event) == uint32(windows.WAIT_TIMEOUT)
-	var code uint32
-	_ = windows.GetExitCodeProcess(c.process, &code)
-	if stillAlive {
-		_ = windows.TerminateProcess(c.process, 1)
-		_, _ = windows.WaitForSingleObject(c.process, 1000)
-	}
-	_ = c.release()
-	ptyLogf("diag: %s -> attached=%v %s", label, !stillAlive, fmtExit(code, stillAlive, 1500*time.Millisecond))
-}
-
-// conptyProbe runs one spawn with a hard timeout so a blocked probe cannot
-// silence the remaining log lines.
-func conptyProbe(argv []string, dir string, env []string, useStdHandles bool, label string) {
+// conptyProbe starts argv on a fresh pseudo console through go-pty, collects
+// output for d, then tears the session down. A hard timeout keeps a blocked
+// probe from silencing the remaining log lines.
+func conptyProbe(argv []string, dir string, env []string, label string) {
 	done := make(chan string, 1)
 	go func() {
-		c, err := spawnConPTY(argv, dir, 80, 24, env, useStdHandles)
+		p, err := gopt.New()
 		if err != nil {
-			done <- fmt.Sprintf("spawn err %v", err)
+			done <- fmt.Sprintf("new err %v", err)
 			return
 		}
-		n, out := readFor(c, 2000)
-		code := exitCodeOf(c)
-		msg := fmt.Sprintf("%d bytes, %s%s", n, fmtExit(code, false, 0), previewSuffix(out))
-		_ = c.release()
-		done <- msg
+		c := p.Command(argv[0], argv[1:]...)
+		c.Dir = dir
+		c.Env = env
+		if err := c.Start(); err != nil {
+			_ = p.Close()
+			done <- fmt.Sprintf("start err %v", err)
+			return
+		}
+		n, out := readFor(p, func() { _ = p.Close() }, 2*time.Second)
+		if c.Process != nil {
+			_ = c.Process.Kill()
+		}
+		_ = c.Wait()
+		done <- fmt.Sprintf("%d bytes%s", n, previewSuffix(out))
 	}()
 	select {
 	case msg := <-done:
@@ -218,51 +99,49 @@ func conptyProbe(argv []string, dir string, env []string, useStdHandles bool, la
 // spawn also spins up conhost, so a failure here points at the session or
 // job context rather than at the pseudo console.
 func spawnPlainWait(argv []string, dir string, env []string) (uint32, bool) {
-	commandLine, err := windows.UTF16PtrFromString(windowsCommandLine(argv))
-	if err != nil {
-		return 0, false
-	}
-	var dirPtr *uint16
-	if dir != "" {
-		if dirPtr, err = windows.UTF16PtrFromString(dir); err != nil {
-			return 0, false
-		}
-	}
-	si := &windows.StartupInfo{Cb: uint32(unsafe.Sizeof(windows.StartupInfo{}))}
-	pi := &windows.ProcessInformation{}
-	flags := uint32(windows.CREATE_NO_WINDOW)
-	var envBlock *uint16
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Dir = dir
 	if env != nil {
-		flags |= windows.CREATE_UNICODE_ENVIRONMENT
-		envBlock = envBlockUTF16(env)
+		cmd.Env = env
 	}
-	if err := windows.CreateProcess(nil, commandLine, nil, nil, false, flags, envBlock, dirPtr, si, pi); err != nil {
-		ptyLogf("diag: plain CreateProcess err %v", err)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: windows.CREATE_NO_WINDOW,
+	}
+	if err := cmd.Start(); err != nil {
+		ptyLogf("diag: plain start err %v", err)
 		return 0, false
 	}
-	event, _ := windows.WaitForSingleObject(pi.Process, 2000)
-	alive := uint32(event) == uint32(windows.WAIT_TIMEOUT)
-	var code uint32
-	_ = windows.GetExitCodeProcess(pi.Process, &code)
-	if alive {
-		_ = windows.TerminateProcess(pi.Process, 1)
-		_, _ = windows.WaitForSingleObject(pi.Process, 1000)
+	done := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		code := 0
+		if cmd.ProcessState != nil {
+			code = cmd.ProcessState.ExitCode()
+		}
+		return uint32(code), false
+	case <-time.After(2 * time.Second):
+		_ = cmd.Process.Kill()
+		<-done
+		return 0, true
 	}
-	_ = windows.CloseHandle(pi.Process)
-	_ = windows.CloseHandle(pi.Thread)
-	return code, alive
 }
 
-// readFor collects pseudo console output for d, then closes the console so
-// the blocking reader unblocks.
-func readFor(c *conptyProc, d time.Duration) (int, []byte) {
+// readFor collects reader output for d, invokes closeFn to unblock the
+// reader (ConPTY pipes never hit EOF on their own), and waits for it to
+// drain.
+func readFor(r io.Reader, closeFn func(), d time.Duration) (int, []byte) {
 	var mu sync.Mutex
 	var all []byte
 	done := make(chan struct{})
 	go func() {
 		buf := make([]byte, 4096)
 		for {
-			n, err := c.Read(buf)
+			n, err := r.Read(buf)
 			if n > 0 {
 				mu.Lock()
 				all = append(all, buf[:n]...)
@@ -275,18 +154,21 @@ func readFor(c *conptyProc, d time.Duration) (int, []byte) {
 		}
 	}()
 	time.Sleep(d)
-	c.closeConsole()
+	closeFn()
 	<-done
 	mu.Lock()
 	defer mu.Unlock()
 	return len(all), all
 }
 
-func exitCodeOf(c *conptyProc) uint32 {
-	_, _ = windows.WaitForSingleObject(c.process, 3000)
-	var code uint32
-	_ = windows.GetExitCodeProcess(c.process, &code)
-	return code
+// rtlGetVersionForLog records the Windows build the sidecar runs on so
+// ConPTY behavior can be correlated with the OS version.
+func rtlGetVersionForLog() error {
+	vi := windows.RtlGetVersion()
+	ptyLogf("diag: windows %d.%d build %d | sizeof STARTUPINFO=%d STARTUPINFOEX=%d",
+		vi.MajorVersion, vi.MinorVersion, vi.BuildNumber,
+		unsafe.Sizeof(windows.StartupInfo{}), unsafe.Sizeof(windows.StartupInfoEx{}))
+	return nil
 }
 
 func previewSuffix(b []byte) string {
