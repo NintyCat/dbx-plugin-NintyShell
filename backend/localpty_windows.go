@@ -260,7 +260,10 @@ type localPTY struct {
 }
 
 func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) {
-	c, err := spawnConPTY(localPTYArgv(shellPath), dir, cols, rows, localPTYEnv(), true)
+	// No STARTF_USESTDHANDLES: with a pseudo console the child's std handles
+	// come from the console, and forcing them to NULL is a known cause of
+	// silent shells (Windows Terminal does not set the flag either).
+	c, err := spawnConPTY(localPTYArgv(shellPath), dir, cols, rows, localPTYEnv(), false)
 	if err != nil {
 		return nil, err
 	}

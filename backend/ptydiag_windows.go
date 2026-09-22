@@ -43,38 +43,84 @@ func (l *localPTY) noteSilentExit() {
 }
 
 func runDiagnoseConPTYFailure(shellPath, dir string, exitCode uint32) {
-	vi := windows.RtlGetVersion()
-	ptyLogf("diag: windows %d.%d build %d | sizeof STARTUPINFO=%d STARTUPINFOEX=%d",
-		vi.MajorVersion, vi.MinorVersion, vi.BuildNumber,
-		unsafe.Sizeof(windows.StartupInfo{}), unsafe.Sizeof(windows.StartupInfoEx{}))
-	ptyLogf("diag: probes for exit %d (0x%08X)", exitCode, exitCode)
+	_ = rtlGetVersionForLog()
 	argv := localPTYArgv(shellPath)
 	ours := localPTYEnv()
+
+	// Decisive first: close the pseudo console 0.8s after spawn - if the
+	// child survives, it was never attached (own console) and every output
+	// byte went there instead of our pipe.
+	attachedProbe(argv, dir, ours, "attach-test powershell env=ours")
 
 	code, alive := spawnPlainWait(argv, dir, nil)
 	ptyLogf("diag: plain powershell env=inherit -> %s", fmtExit(code, alive, 2*time.Second))
 	code, alive = spawnPlainWait(argv, dir, ours)
 	ptyLogf("diag: plain powershell env=ours -> %s", fmtExit(code, alive, 2*time.Second))
 
-	conptyProbe(argv, dir, nil, true, "conpty powershell env=inherit")
-	conptyProbe(argv, dir, ours, true, "conpty powershell env=ours")
-	conptyProbe(argv, dir, ours, false, "conpty powershell env=ours no-USESTDHANDLES")
+	conptyProbe(argv, dir, nil, false, "conpty powershell env=inherit")
+	conptyProbe(argv, dir, ours, false, "conpty powershell env=ours")
+	conptyProbe(argv, dir, ours, true, "conpty powershell env=ours USESTDHANDLES")
 	if cmd, err := exec.LookPath("cmd.exe"); err == nil {
-		conptyProbe([]string{cmd, "/c", "echo diag_ok"}, dir, nil, true, "conpty cmd /c echo env=inherit")
+		conptyProbe([]string{cmd, "/c", "echo diag_ok"}, dir, nil, false, "conpty cmd /c echo env=inherit")
 	}
 	ptyLogf("diag: probes done")
 }
 
-func conptyProbe(argv []string, dir string, env []string, useStdHandles bool, label string) {
-	c, err := spawnConPTY(argv, dir, 80, 24, env, useStdHandles)
+// rtlGetVersionForLog records the Windows build the sidecar runs on so
+// ConPTY behavior can be correlated with the OS version.
+func rtlGetVersionForLog() error {
+	vi := windows.RtlGetVersion()
+	ptyLogf("diag: windows %d.%d build %d | sizeof STARTUPINFO=%d STARTUPINFOEX=%d",
+		vi.MajorVersion, vi.MinorVersion, vi.BuildNumber,
+		unsafe.Sizeof(windows.StartupInfo{}), unsafe.Sizeof(windows.StartupInfoEx{}))
+	return nil
+}
+
+// attachedProbe closes the pseudo console shortly after spawn and reports
+// whether the child died with it. Surviving the close means the
+// PSEUDOCONSOLE attribute never reached the child.
+func attachedProbe(argv []string, dir string, env []string, label string) {
+	c, err := spawnConPTY(argv, dir, 80, 24, env, false)
 	if err != nil {
 		ptyLogf("diag: %s -> spawn err %v", label, err)
 		return
 	}
-	n, out := readFor(c, 2500)
-	code := exitCodeOf(c)
-	ptyLogf("diag: %s -> %d bytes, %s%s", label, n, fmtExit(code, false, 0), previewSuffix(out))
+	time.Sleep(800 * time.Millisecond)
+	c.closeConsole()
+	event, _ := windows.WaitForSingleObject(c.process, 1500)
+	stillAlive := uint32(event) == uint32(windows.WAIT_TIMEOUT)
+	var code uint32
+	_ = windows.GetExitCodeProcess(c.process, &code)
+	if stillAlive {
+		_ = windows.TerminateProcess(c.process, 1)
+		_, _ = windows.WaitForSingleObject(c.process, 1000)
+	}
 	_ = c.release()
+	ptyLogf("diag: %s -> attached=%v %s", label, !stillAlive, fmtExit(code, stillAlive, 1500*time.Millisecond))
+}
+
+// conptyProbe runs one spawn with a hard timeout so a blocked probe cannot
+// silence the remaining log lines.
+func conptyProbe(argv []string, dir string, env []string, useStdHandles bool, label string) {
+	done := make(chan string, 1)
+	go func() {
+		c, err := spawnConPTY(argv, dir, 80, 24, env, useStdHandles)
+		if err != nil {
+			done <- fmt.Sprintf("spawn err %v", err)
+			return
+		}
+		n, out := readFor(c, 2000)
+		code := exitCodeOf(c)
+		msg := fmt.Sprintf("%d bytes, %s%s", n, fmtExit(code, false, 0), previewSuffix(out))
+		_ = c.release()
+		done <- msg
+	}()
+	select {
+	case msg := <-done:
+		ptyLogf("diag: %s -> %s", label, msg)
+	case <-time.After(8 * time.Second):
+		ptyLogf("diag: %s -> PROBE TIMED OUT (blocked)", label)
+	}
 }
 
 // spawnPlainWait starts a console process without a pseudo console (hidden
