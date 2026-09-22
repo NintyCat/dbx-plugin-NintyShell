@@ -76,6 +76,12 @@ type shellSession struct {
 	sftpMutex sync.Mutex
 	sftpConn  *sftp.Client
 
+	// Local interactive terminal: set when the session runs as a real PTY
+	// (nil in the per-command exec fallback used when no PTY is available).
+	localPty  *localPTY
+	ptyClosed bool // local PTY only: the shell has exited
+	stopping  bool // shutdown() has started: suppress pty-closed events
+
 	ptyMutex   sync.Mutex
 	ptySession *ssh.Session
 	ptyStdin   io.WriteCloser
@@ -176,9 +182,13 @@ func (s *shellSession) shutdown() {
 	s.mutex.Lock()
 	cancel := s.cancelFn
 	s.cancelFn = nil
+	s.stopping = true
 	s.mutex.Unlock()
 	if cancel != nil {
 		cancel()
+	}
+	if s.localPty != nil {
+		_ = s.localPty.Close()
 	}
 	if s.kind == "ssh" {
 		s.ptyMutex.Lock()
@@ -309,7 +319,7 @@ func (p *plugin) testConnection(values map[string]any) any {
 	}
 }
 
-func (p *plugin) connect(values map[string]any, emitter *dbxpluginsdk.Emitter) (any, *dbxpluginsdk.PluginError) {
+func (p *plugin) connect(values map[string]any, emitter eventEmitter) (any, *dbxpluginsdk.PluginError) {
 	connectionID, pluginErr := requestConnectionID(values)
 	if pluginErr != nil {
 		return nil, pluginErr
@@ -320,7 +330,7 @@ func (p *plugin) connect(values map[string]any, emitter *dbxpluginsdk.Emitter) (
 	if providerID(values) == providerSSH {
 		newSession, result, pluginErr2 = p.connectSSH(values, connectionID, emitter)
 	} else {
-		newSession, result, pluginErr2 = p.connectLocal(values, connectionID)
+		newSession, result, pluginErr2 = p.connectLocal(values, connectionID, emitter)
 	}
 	if pluginErr2 != nil {
 		return nil, pluginErr2
@@ -337,7 +347,7 @@ func (p *plugin) connect(values map[string]any, emitter *dbxpluginsdk.Emitter) (
 	return result, nil
 }
 
-func (p *plugin) connectLocal(values map[string]any, connectionID string) (*shellSession, any, *dbxpluginsdk.PluginError) {
+func (p *plugin) connectLocal(values map[string]any, connectionID string, emitter eventEmitter) (*shellSession, any, *dbxpluginsdk.PluginError) {
 	shellPath, shellErr := resolveShell(configString(values, "shell_path"))
 	if shellErr != "" {
 		return nil, map[string]any{"success": false, "message": shellErr}, nil
@@ -347,12 +357,21 @@ func (p *plugin) connectLocal(values map[string]any, connectionID string) (*shel
 		return nil, map[string]any{"success": false, "message": dirErr}, nil
 	}
 	session := &shellSession{id: connectionID, kind: "local", shellPath: shellPath, cwd: dir}
-	return session, map[string]any{
+	result := map[string]any{
 		"success": true,
 		"message": "Shell session started",
 		"shell":   shellPath,
 		"cwd":     dir,
-	}, nil
+	}
+	if err := openLocalPTY(session, emitter); err != nil {
+		// No pseudo terminal available (old Windows, restricted sandbox):
+		// fall back to the per-command exec mode instead of failing.
+		log.Printf("local PTY unavailable (%v); falling back to per-command mode", err)
+		result["pty"] = false
+	} else {
+		result["pty"] = true
+	}
+	return session, result, nil
 }
 
 func (p *plugin) disconnect(values map[string]any) (any, *dbxpluginsdk.PluginError) {
@@ -491,9 +510,11 @@ func (p *plugin) workingDir(values map[string]any) (any, *dbxpluginsdk.PluginErr
 		home, _ := os.UserHomeDir()
 		result["shell"] = current.shellPath
 		result["home"] = home
+		result["pty"] = current.localPty != nil
 	} else {
 		result["home"] = current.home
 		result["sid"] = current.sid
+		result["pty"] = true
 	}
 	return result, nil
 }
@@ -1162,7 +1183,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.6.0"
+	pluginVersion = "0.7.0"
 )
 
 func main() {

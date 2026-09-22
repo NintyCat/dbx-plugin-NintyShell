@@ -101,8 +101,11 @@
       .modal-card input { width: 100%; border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); border-radius: 8px; padding: 7px 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; margin-bottom: 14px; }
       .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
       .modal-actions .primary { background: var(--color-primary, #2563eb); color: #fff; border-color: transparent; }
-      #ptyHost { flex: 1; min-height: 0; padding: 8px 10px 10px; background: #16181d; overflow: hidden; }
-      #ptyHost .xterm { height: 100%; }
+      /* ptyHost 是 FitAddon 的测量父元素：computed height 在 border-box 下含 padding，
+         但 FitAddon 只减 .xterm 自身的 padding，所以内边距必须挂在 .xterm 上，
+         否则行数多算约一个 padding 的高度，最后一行被 overflow:hidden 裁掉。 */
+      #ptyHost { flex: 1; min-height: 0; background: #16181d; overflow: hidden; }
+      #ptyHost .xterm { height: 100%; padding: 8px 10px 10px; }
       [hidden] { display: none !important; }
     </style>
   </head>
@@ -230,6 +233,7 @@
           emptyText: "Open this workbench from a saved Shell or SSH connection. Create one through the plugin's connection form first, then open it.",
           noConnection: "no connection id in context",
           loadError: "Failed to initialize session: ",
+          ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -269,6 +273,7 @@
           emptyText: "请先通过插件的连接表单创建并保存一个本地 Shell 或 SSH 连接，然后从该连接打开此工作台。",
           noConnection: "上下文中没有连接 ID",
           loadError: "会话初始化失败：",
+          ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -578,7 +583,9 @@
           remoteCwd = cwd || "/";
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
-          if (sessionKind === "ssh") {
+          // 文件面板走 SFTP，只有 SSH 会话可用
+          tabFiles.hidden = sessionKind !== "ssh";
+          if (info.pty || sessionKind === "ssh") {
             initPTY();
             showTab("terminal");
             dot.className = "dot ok";
@@ -682,7 +689,7 @@
         }
         if (method === "shell/pty-closed") {
           if (ptyMode && termReady) {
-            term.write("\r\n\x1b[33m—— 远程会话已结束，请从连接列表重新连接 ——\x1b[0m\r\n");
+            term.write("\r\n\x1b[33m" + text.ptyClosed + "\x1b[0m\r\n");
             setDisconnected();
           }
           return;

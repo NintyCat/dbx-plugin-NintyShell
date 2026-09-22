@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"sort"
@@ -119,7 +120,7 @@ func sshAuthMethods(values map[string]any) ([]ssh.AuthMethod, string) {
 	return methods, ""
 }
 
-func (p *plugin) connectSSH(values map[string]any, connectionID string, emitter *dbxpluginsdk.Emitter) (*shellSession, any, *dbxpluginsdk.PluginError) {
+func (p *plugin) connectSSH(values map[string]any, connectionID string, emitter eventEmitter) (*shellSession, any, *dbxpluginsdk.PluginError) {
 	host := strings.TrimSpace(configString(values, "host"))
 	if host == "" {
 		return nil, map[string]any{"success": false, "message": "Host is required"}, nil
@@ -212,7 +213,7 @@ func keepaliveLoop(s *shellSession) {
 
 // openPTYShell starts an interactive remote shell with a PTY and streams raw
 // output to the UI. Keystrokes arrive via shell/input.
-func openPTYShell(s *shellSession, emitter *dbxpluginsdk.Emitter) error {
+func openPTYShell(s *shellSession, emitter eventEmitter) error {
 	if s.isDead() {
 		return errors.New(s.deadError())
 	}
@@ -269,7 +270,14 @@ func openPTYShell(s *shellSession, emitter *dbxpluginsdk.Emitter) error {
 				})
 			}
 			if readErr != nil {
-				_ = emitter.Event("shell/pty-closed", map[string]any{"connectionId": sessionID})
+				// A replaced (shutdown) session must not announce its own
+				// closure over the shared connectionId.
+				s.mutex.Lock()
+				stopping := s.stopping
+				s.mutex.Unlock()
+				if !stopping {
+					_ = emitter.Event("shell/pty-closed", map[string]any{"connectionId": sessionID})
+				}
 				return
 			}
 		}
@@ -282,18 +290,30 @@ func (p *plugin) ptyInput(values map[string]any) (any, *dbxpluginsdk.PluginError
 	if pluginErr != nil {
 		return nil, pluginErr
 	}
-	if current.kind != "ssh" {
-		return nil, dbxpluginsdk.NewError(-32000, "shell/input requires an SSH connection")
-	}
 	data, err := base64.StdEncoding.DecodeString(stringField(values, "data"))
 	if err != nil {
 		return nil, dbxpluginsdk.NewError(-32602, "Invalid input encoding")
 	}
-	current.ptyMutex.Lock()
-	stdin := current.ptyStdin
-	current.ptyMutex.Unlock()
-	if stdin == nil {
-		return fail("PTY shell is not open")
+	var stdin io.Writer
+	if current.kind == "ssh" {
+		if current.isDead() {
+			return fail(current.deadError())
+		}
+		current.ptyMutex.Lock()
+		stdin = current.ptyStdin
+		current.ptyMutex.Unlock()
+	} else {
+		current.mutex.Lock()
+		closed := current.ptyClosed
+		pty := current.localPty
+		current.mutex.Unlock()
+		if pty == nil {
+			return nil, dbxpluginsdk.NewError(-32000, "shell/input requires an interactive session")
+		}
+		if closed {
+			return fail("Shell has exited. Please reconnect from the connection list.")
+		}
+		stdin = pty
 	}
 	current.ptyWriteMu.Lock()
 	_, writeErr := stdin.Write(data)
@@ -309,12 +329,19 @@ func (p *plugin) ptyResize(values map[string]any) (any, *dbxpluginsdk.PluginErro
 	if pluginErr != nil {
 		return nil, pluginErr
 	}
-	if current.kind != "ssh" {
-		return map[string]any{"success": true}, nil
-	}
 	cols, _ := values["cols"].(float64)
 	rows, _ := values["rows"].(float64)
 	if cols < 2 || rows < 2 || cols > 1000 || rows > 1000 {
+		return map[string]any{"success": true}, nil
+	}
+	if current.kind != "ssh" {
+		current.mutex.Lock()
+		pty := current.localPty
+		current.mutex.Unlock()
+		if pty == nil {
+			return map[string]any{"success": true}, nil
+		}
+		_ = pty.Resize(uint16(cols), uint16(rows))
 		return map[string]any{"success": true}, nil
 	}
 	current.ptyMutex.Lock()
