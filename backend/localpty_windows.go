@@ -123,7 +123,10 @@ func spawnConPTY(argv []string, dir string, cols, rows uint16, env []string, use
 	si.ProcThreadAttributeList = attrs.List()
 	pi := &windows.ProcessInformation{}
 	var envBlock *uint16
-	creationFlags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT)
+	// CREATE_NO_WINDOW: if the PSEUDOCONSOLE attribute ever fails to apply
+	// (observed on Windows 11 25H2), the child would otherwise delegate to a
+	// visible Windows Terminal window and spam one per connect.
+	creationFlags := uint32(windows.EXTENDED_STARTUPINFO_PRESENT | windows.CREATE_NO_WINDOW)
 	if env != nil {
 		creationFlags |= windows.CREATE_UNICODE_ENVIRONMENT
 		envBlock = envBlockUTF16(env)

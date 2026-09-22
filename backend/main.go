@@ -223,8 +223,9 @@ type execRun struct {
 }
 
 type plugin struct {
-	mutex    sync.Mutex
-	sessions map[string]*shellSession
+	mutex     sync.Mutex
+	sessions  map[string]*shellSession
+	fallbacks map[string]bool // connections whose PTY never produced output
 }
 
 func (p *plugin) Handle(ctx dbxpluginsdk.RequestContext, method string, params json.RawMessage, emitter *dbxpluginsdk.Emitter) (any, *dbxpluginsdk.PluginError) {
@@ -369,7 +370,16 @@ func (p *plugin) connectLocal(values map[string]any, connectionID string, emitte
 		"shell":   shellPath,
 		"cwd":     dir,
 	}
-	if err := openLocalPTY(session, emitter); err != nil {
+	p.mutex.Lock()
+	knownBad := p.fallbacks[connectionID]
+	p.mutex.Unlock()
+	if knownBad {
+		// This connection's pseudo console never produced output on this
+		// machine; go straight to per-command mode.
+		result["pty"] = false
+		return session, result, nil
+	}
+	if err := openLocalPTY(p, session, emitter); err != nil {
 		// No pseudo terminal available (old Windows, restricted sandbox):
 		// fall back to the per-command exec mode instead of failing.
 		log.Printf("local PTY unavailable (%v); falling back to per-command mode", err)
@@ -378,6 +388,28 @@ func (p *plugin) connectLocal(values map[string]any, connectionID string, emitte
 		result["pty"] = true
 	}
 	return session, result, nil
+}
+
+// fallbackSession tears down a silent pseudo console mid-session and switches
+// the connection to per-command exec mode, telling the UI to reload into the
+// legacy view. Remembered for the connection so later connects skip the PTY
+// entirely instead of entering a fallback/reload loop.
+func (p *plugin) fallbackSession(s *shellSession, emitter eventEmitter) {
+	s.mutex.Lock()
+	if s.stopping || s.localPty == nil {
+		s.mutex.Unlock()
+		return
+	}
+	pty := s.localPty
+	s.localPty = nil
+	s.stopping = true // the UI learns about the switch via shell/legacy-fallback
+	p.mutex.Lock()
+	p.fallbacks[s.id] = true
+	p.mutex.Unlock()
+	s.mutex.Unlock()
+	_ = pty.Close()
+	_ = emitter.Event("shell/legacy-fallback", map[string]any{"connectionId": s.id})
+	ptyLogf("session fell back to per-command mode")
 }
 
 func (p *plugin) disconnect(values map[string]any) (any, *dbxpluginsdk.PluginError) {
@@ -1189,7 +1221,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.7.6"
+	pluginVersion = "0.7.7"
 )
 
 func main() {
@@ -1198,7 +1230,10 @@ func main() {
 		Version:      pluginVersion,
 		Capabilities: []string{"connections", "events"},
 	}
-	server := dbxpluginsdk.NewServer(metadata, &plugin{sessions: map[string]*shellSession{}})
+	server := dbxpluginsdk.NewServer(metadata, &plugin{
+		sessions:  map[string]*shellSession{},
+		fallbacks: map[string]bool{},
+	})
 	if err := server.Serve(); err != nil {
 		log.Fatal(err)
 	}

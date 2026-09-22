@@ -234,6 +234,7 @@
           noConnection: "no connection id in context",
           loadError: "Failed to initialize session: ",
           ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
+          legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -274,6 +275,7 @@
           noConnection: "上下文中没有连接 ID",
           loadError: "会话初始化失败：",
           ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
+          legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -595,6 +597,12 @@
             renderPrompt();
             const out = commandBlock("");
             appendText(out, text.welcome(shellPath || sessionKind, cwd));
+            let legacyFallback = false;
+            try {
+              legacyFallback = sessionStorage.getItem("nintyshell.legacyFallback") === "1";
+              sessionStorage.removeItem("nintyshell.legacyFallback");
+            } catch (_) {}
+            if (legacyFallback) appendNotice(out, "notice", text.legacyMode);
             setRunning(false);
           }
         } catch (error) {
@@ -673,7 +681,7 @@
         const method = event && event.method;
         const params = (event && event.params) || {};
         ptyHost.dataset.dbg = method + "|" + (ptyMode ? "pty" : "legacy") + "|" + (termReady ? "ready" : "notready") + "|" + Date.now();
-        if (method !== "shell/output" && method !== "shell/exit") return;
+        if (method !== "shell/output" && method !== "shell/exit" && method !== "shell/pty-closed" && method !== "shell/legacy-fallback") return;
         if (params.connectionId !== connectionId) return;
         if (method === "shell/output") {
           const bytes = base64ToBytes(params.data || "");
@@ -685,6 +693,13 @@
           if (!currentOut || !decoder) return;
           const value = decoder.decode(bytes, { stream: true });
           streamChunk(clean(value));
+          return;
+        }
+        if (method === "shell/legacy-fallback") {
+          // 伪终端零输出：后端已切回逐命令模式，重载进入兼容视图
+          if (params.connectionId !== connectionId) return;
+          try { sessionStorage.setItem("nintyshell.legacyFallback", "1"); } catch (_) {}
+          location.reload();
           return;
         }
         if (method === "shell/pty-closed") {

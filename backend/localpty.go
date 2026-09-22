@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	dbxpluginsdk "github.com/t8y2/dbx/plugins/sdk/go/dbx-plugin-sdk"
@@ -80,7 +81,7 @@ func ptyLogf(format string, args ...any) {
 // raw output to the UI, mirroring the SSH PTY path: keystrokes arrive via
 // shell/input, resizes via shell/resize, and the read loop emits
 // shell/pty-closed once the shell exits.
-func openLocalPTY(s *shellSession, emitter eventEmitter) error {
+func openLocalPTY(p *plugin, s *shellSession, emitter eventEmitter) error {
 	pty, err := startLocalPTY(s.shellPath, s.cwd, localPtyDefaultCols, localPtyDefaultRows)
 	if err != nil {
 		ptyLogf("start failed shell=%q: %v", s.shellPath, err)
@@ -89,16 +90,15 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 	ptyLogf("started v%s shell=%q dir=%q", pluginVersion, s.shellPath, s.cwd)
 	s.localPty = pty
 	sessionID := s.id
+	var outputSeen atomic.Bool
 	go func() {
 		defer guardPanic("local-pty-read")
 		buf := make([]byte, 8192)
-		firstOutput := true
 		for {
 			n, readErr := pty.Read(buf)
 			if n > 0 {
-				if firstOutput {
+				if !outputSeen.Swap(true) {
 					ptyLogf("first output: %d bytes", n)
-					firstOutput = false
 				}
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
@@ -108,14 +108,7 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 				})
 			}
 			if readErr != nil {
-				ptyLogf("read ended: %v (got output=%v)", readErr, !firstOutput)
-				if firstOutput {
-					// A session that never produced a single byte is the
-					// signature of the pseudoconsole attribute not being
-					// applied (the child spawns its own console window) or
-					// the console never rendering; run the probes.
-					pty.noteSilentExit()
-				}
+				ptyLogf("read ended: %v (got output=%v)", readErr, outputSeen.Load())
 				s.mutex.Lock()
 				stopping := s.stopping
 				if !stopping {
@@ -128,6 +121,23 @@ func openLocalPTY(s *shellSession, emitter eventEmitter) error {
 				return
 			}
 		}
+	}()
+	// A live session with zero output is the Windows failure mode; tear the
+	// pseudo console down and switch the connection to per-command mode while
+	// the session is still open, instead of showing a dead terminal forever.
+	go func() {
+		defer guardPanic("local-pty-silent-watch")
+		time.Sleep(4 * time.Second)
+		if outputSeen.Load() {
+			return
+		}
+		s.mutex.Lock()
+		stopping := s.stopping
+		s.mutex.Unlock()
+		if stopping {
+			return
+		}
+		p.fallbackSession(s, emitter)
 	}()
 	return nil
 }
