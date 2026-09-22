@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -30,13 +32,122 @@ type eventEmitter interface {
 func localPTYArgv(shellPath string) []string {
 	switch shellStyleFor(shellPath) {
 	case powershellShell:
-		// -NoExit keeps the session interactive; the command pins UTF-8 so
-		// ConPTY output survives the UI's UTF-8 decode.
-		return []string{shellPath, "-NoLogo", "-NoExit", "-Command", "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8"}
+		// -NoExit keeps the session interactive; the init pins UTF-8 and
+		// wraps the prompt so it reports the cwd via OSC 7 (see osc7Scanner).
+		return []string{shellPath, "-NoLogo", "-NoExit", "-EncodedCommand", encodePowerShellScript(powershellOsc7Init())}
 	case cmdShell:
 		return []string{shellPath, "/K", "chcp 65001 >nul"}
 	default:
 		return []string{shellPath, "-l"}
+	}
+}
+
+// powershellOsc7Init is fed to -EncodedCommand for PTY sessions: UTF-8
+// output for the UI's decoder, plus a prompt wrapper that emits an OSC 7
+// cwd report while preserving the profile's own prompt function.
+func powershellOsc7Init() string {
+	return strings.Join([]string{
+		"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
+		"$OutputEncoding = [System.Text.Encoding]::UTF8",
+		"$global:__dbxPrompt = $function:prompt",
+		"function global:prompt {",
+		`  [Console]::Write([char]27 + "]7;file://" + [uri]::EscapeDataString($PWD.Path) + [char]7)`,
+		"  if ($global:__dbxPrompt) { & $global:__dbxPrompt } else { \"PS $($PWD.Path)> \" }",
+		"}",
+	}, "\n")
+}
+
+// osc7Scanner extracts OSC 7 cwd reports ("ESC ] 7 ; file://URI BEL" or
+// "... ESC \") from a PTY byte stream. Sequences can split across reads, so
+// a small carry buffer bridges the chunks.
+type osc7Scanner struct {
+	pending []byte
+}
+
+func (s *osc7Scanner) feed(chunk []byte) string {
+	s.pending = append(s.pending, chunk...)
+	var last string
+	for {
+		start := bytes.Index(s.pending, []byte("\x1b]7;"))
+		if start < 0 {
+			// keep a short tail so a marker split across chunks survives
+			if len(s.pending) > 64 {
+				s.pending = s.pending[len(s.pending)-64:]
+			}
+			return last
+		}
+		rest := s.pending[start+4:]
+		end, termLen := -1, 0
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == 7 {
+				end, termLen = i, 1
+				break
+			}
+			if rest[i] == 0x1b && i+1 < len(rest) && rest[i+1] == '\\' {
+				end, termLen = i, 2
+				break
+			}
+		}
+		if end < 0 {
+			// payload still arriving; cap the accumulation to bound memory
+			if len(rest) > 8192 {
+				s.pending = nil
+			} else {
+				s.pending = s.pending[start:]
+			}
+			return last
+		}
+		last = string(rest[:end])
+		s.pending = rest[end+termLen:]
+	}
+}
+
+// osc7URIToPath converts an OSC 7 payload (file://host/path, fully
+// percent-encoded, or a raw path) into a native absolute path for goos.
+func osc7URIToPath(uri, goos string) string {
+	raw := strings.TrimSpace(uri)
+	raw = strings.TrimPrefix(raw, "file://")
+	if !strings.HasPrefix(raw, "/") {
+		// drop the authority component of file://host/path
+		if i := strings.Index(raw, "/"); i >= 0 {
+			raw = raw[i:]
+		}
+	}
+	if dec, err := url.PathUnescape(raw); err == nil {
+		raw = dec
+	}
+	if goos == "windows" {
+		raw = strings.ReplaceAll(raw, "/", "\\")
+		if len(raw) >= 2 && raw[0] == '\\' && raw[1] != '\\' {
+			raw = raw[1:] // "/C:\Users" → "C:\Users"
+		}
+		if len(raw) < 3 || raw[1] != ':' {
+			return ""
+		}
+	} else if !strings.HasPrefix(raw, "/") {
+		return ""
+	}
+	return raw
+}
+
+// emitOsc7Cwd updates the session cwd from an OSC 7 report and notifies the
+// UI when it actually changed.
+func emitOsc7Cwd(s *shellSession, emitter eventEmitter, uri string) {
+	cwd := osc7URIToPath(uri, runtime.GOOS)
+	if cwd == "" {
+		return
+	}
+	s.mutex.Lock()
+	changed := cwd != s.cwd
+	if changed {
+		s.cwd = cwd
+	}
+	s.mutex.Unlock()
+	if changed {
+		_ = emitter.Event("shell/cwd-changed", map[string]any{
+			"connectionId": s.id,
+			"cwd":          cwd,
+		})
 	}
 }
 
@@ -93,6 +204,7 @@ func openLocalPTY(p *plugin, s *shellSession, emitter eventEmitter) error {
 	s.localPty = pty
 	sessionID := s.id
 	var outputSeen atomic.Bool
+	scanner := &osc7Scanner{}
 	go func() {
 		defer guardPanic("local-pty-read")
 		buf := make([]byte, 8192)
@@ -104,6 +216,9 @@ func openLocalPTY(p *plugin, s *shellSession, emitter eventEmitter) error {
 				}
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
+				if uri := scanner.feed(chunk); uri != "" {
+					emitOsc7Cwd(s, emitter, uri)
+				}
 				_ = emitter.Event("shell/output", map[string]any{
 					"connectionId": sessionID,
 					"data":         chunk,

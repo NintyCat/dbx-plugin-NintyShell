@@ -5,6 +5,8 @@ package main
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -16,23 +18,44 @@ import (
 // file is the slave side: reads return the shell's output, writes feed its
 // keyboard.
 type localPTY struct {
-	file *os.File
-	cmd  *exec.Cmd
-	once sync.Once
+	file    *os.File
+	cmd     *exec.Cmd
+	cleanup func() // release per-session injection files
+	once    sync.Once
 }
 
 func startLocalPTY(shellPath, dir string, cols, rows uint16) (*localPTY, error) {
+	argv := localPTYArgv(shellPath)
+	env := localPTYEnv()
+	var cleanup func()
+	// Prompt-level OSC 7 injection per shell so the SFTP panel can follow
+	// the cwd; shims wrap the user's own configuration (VS Code style).
+	switch strings.ToLower(filepath.Base(shellPath)) {
+	case "zsh":
+		if shimDir, err := writeZshOsc7Shim(); err == nil {
+			env = append(env, "ZDOTDIR="+shimDir)
+			cleanup = func() { _ = os.RemoveAll(shimDir) }
+		}
+	case "bash":
+		if rc, err := writeBashOsc7Rc(); err == nil {
+			argv = append(argv, "--rcfile", rc)
+			cleanup = func() { _ = os.Remove(rc) }
+		}
+	}
 	cmd := exec.Command(shellPath)
-	cmd.Args = localPTYArgv(shellPath)
+	cmd.Args = argv
 	cmd.Dir = dir
-	cmd.Env = localPTYEnv()
+	cmd.Env = env
 	// StartWithSize makes the shell a session leader with the terminal as its
 	// controlling device, so job control and ^C behave like a real tty.
 	file, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: cols, Rows: rows})
 	if err != nil {
+		if cleanup != nil {
+			cleanup()
+		}
 		return nil, err
 	}
-	return &localPTY{file: file, cmd: cmd}, nil
+	return &localPTY{file: file, cmd: cmd, cleanup: cleanup}, nil
 }
 
 func (l *localPTY) Read(p []byte) (int, error)  { return l.file.Read(p) }
@@ -54,6 +77,9 @@ func (l *localPTY) noteSilentExit() {}
 func (l *localPTY) Close() error {
 	var err error
 	l.once.Do(func() {
+		if l.cleanup != nil {
+			l.cleanup()
+		}
 		if l.cmd.Process != nil {
 			_ = syscall.Kill(-l.cmd.Process.Pid, syscall.SIGHUP)
 		}
@@ -67,4 +93,49 @@ func (l *localPTY) Close() error {
 		}()
 	})
 	return err
+}
+
+const osc7POSIX = `printf '\033]7;file://%s\007' "$PWD"`
+
+// writeBashOsc7Rc creates an rcfile that sources the user's configuration
+// and prepends an OSC 7 cwd report to PROMPT_COMMAND.
+func writeBashOsc7Rc() (string, error) {
+	f, err := os.CreateTemp("", "dbx-osc7-*.sh")
+	if err != nil {
+		return "", err
+	}
+	content := `[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"` + "\n" +
+		`PROMPT_COMMAND="` + osc7POSIX + `${PROMPT_COMMAND:+; $PROMPT_COMMAND}"` + "\n"
+	if _, err := f.WriteString(content); err != nil {
+		f.Close()
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+// writeZshOsc7Shim creates a ZDOTDIR whose startup files source the user's
+// configuration and register an OSC 7 precmd hook.
+func writeZshOsc7Shim() (string, error) {
+	dir, err := os.MkdirTemp("", "dbx-osc7-zsh-")
+	if err != nil {
+		return "", err
+	}
+	shim := `[ -f "$HOME/.zshenv" ] && . "$HOME/.zshenv"` + "\n" +
+		`[ -f "$HOME/.zshrc" ] && . "$HOME/.zshrc"` + "\n" +
+		`__dbx_osc7() { ` + osc7POSIX + ` }` + "\n" +
+		`precmd_functions+=(__dbx_osc7)` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, ".zshrc"), []byte(shim), 0o600); err != nil {
+		_ = os.RemoveAll(dir)
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".zshenv"), []byte(`[ -f "$HOME/.zshenv" ] && . "$HOME/.zshenv"`+"\n"), 0o600); err != nil {
+		_ = os.RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
 }

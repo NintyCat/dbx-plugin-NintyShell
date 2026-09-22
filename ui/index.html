@@ -29,6 +29,13 @@
       .tab.active { background: var(--color-background, Canvas); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
       .meta { flex: 1; min-width: 0; font-size: 11px; opacity: .5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .actions { display: flex; gap: 8px; flex: none; }
+      #settingsPanel { position: fixed; top: 48px; right: 10px; z-index: 30; width: 300px; padding: 12px 14px; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 12px; background: var(--color-background, Canvas); box-shadow: 0 10px 36px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+      #settingsPanel[hidden] { display: none; }
+      #settingsPanel .set-title { font-weight: 600; }
+      .set-row { display: flex; align-items: center; gap: 8px; line-height: 1.4; }
+      .set-row span { flex: 1; }
+      .set-row input[type="range"] { flex: 1; }
+      .set-note { font-size: 11px; opacity: .6; }
       button { border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; padding: 5px 12px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
       button:hover:not(:disabled) { background: color-mix(in srgb, CanvasText 7%, transparent); }
       button:disabled { opacity: .4; cursor: default; }
@@ -124,8 +131,16 @@
       <div class="actions">
         <button id="btnClear" type="button"></button>
         <button id="btnCancel" type="button" disabled></button>
+        <button id="btnSettings" type="button" aria-label="settings">⚙</button>
       </div>
     </header>
+    <div id="settingsPanel" hidden>
+      <div class="set-title" id="setPanelTitle"></div>
+      <label class="set-row"><input type="checkbox" id="setFollowCwd"><span id="setFollowLabel"></span></label>
+      <label class="set-row"><input type="checkbox" id="setInjectOsc7"><span id="setInjectLabel"></span></label>
+      <div class="set-row"><span id="setFontSizeLabel"></span><input type="range" id="setFontSize" min="10" max="18" step="0.5"><span id="setFontSizeVal"></span></div>
+      <div class="set-note" id="setNote"></div>
+    </div>
     <main id="ptyHost" hidden></main>
     <main id="terminal" hidden>
       <div class="inputline" id="inputLine" hidden>
@@ -207,6 +222,9 @@
       const runningLine = $("runningLine"), runningText = $("runningText");
       const btnClear = $("btnClear"), btnCancel = $("btnCancel");
       const ptyHost = $("ptyHost");
+      const btnSettings = $("btnSettings"), settingsPanel = $("settingsPanel");
+      const setFollowCwd = $("setFollowCwd"), setInjectOsc7 = $("setInjectOsc7"), setFontSizeInput = $("setFontSize");
+      const setFontSizeVal = $("setFontSizeVal");
       const filePanel = $("filePanel"), filePathInput = $("filePathInput"), fileLog = $("fileLog");
       const logTitle = $("logTitle"), logWrap = $("logWrap"), logHead = $("logHead");
       const logCount = $("logCount"), logClear = $("logClear");
@@ -235,6 +253,11 @@
           loadError: "Failed to initialize session: ",
           ptyClosed: "—— Session ended. Please reconnect from the connection list. ——",
           legacyMode: "Interactive terminal unavailable on this system — switched to compatibility mode. Commands run line by line; interactive programs are not available here.",
+          setPanelTitle: "Settings",
+          setFollow: "File panel follows the terminal path",
+          setInject: "Inject cwd reporting into remote SSH shells (opt-in)",
+          setFontSize: "Terminal font size",
+          setNote: "Path following uses the OSC 7 shell report; local bash/zsh/PowerShell get it automatically, remote shells need the injection option above.",
           retry: "Retry",
           modalOk: "OK", modalCancel: "Cancel",
           mkdirTitle: "New remote folder", mkdirPrompt: "Folder name",
@@ -276,6 +299,11 @@
           loadError: "会话初始化失败：",
           ptyClosed: "—— 会话已结束，请从连接列表重新连接 ——",
           legacyMode: "当前系统不支持交互式终端，已切换到兼容模式：逐条执行命令，不支持交互式程序。",
+          setPanelTitle: "设置",
+          setFollow: "文件面板跟随终端路径联动",
+          setInject: "向远程 SSH shell 注入路径上报（默认关闭）",
+          setFontSize: "终端字号",
+          setNote: "路径联动依赖 shell 的 OSC 7 上报：本地 bash/zsh/PowerShell 自动启用，远程 shell 需开启上方注入选项。",
           retry: "重试",
           modalOk: "确定", modalCancel: "取消",
           mkdirTitle: "新建远程目录", mkdirPrompt: "目录名",
@@ -335,6 +363,32 @@
 
       const ansiRegex = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
 
+      // ---- settings (localStorage, degrade gracefully in sandboxed frames) ----
+      const settingsDefaults = { sftpFollowCwd: true, injectOsc7: false, fontSize: 12.5 };
+      let settings = loadSettings();
+      function loadSettings() {
+        try {
+          return Object.assign({}, settingsDefaults, JSON.parse(localStorage.getItem("nintyshell.settings") || "{}"));
+        } catch (_) { return Object.assign({}, settingsDefaults); }
+      }
+      function saveSettings() {
+        try { localStorage.setItem("nintyshell.settings", JSON.stringify(settings)); } catch (_) {}
+        applySettings();
+      }
+      function applySettings() {
+        if (term) {
+          term.options.fontSize = settings.fontSize;
+          schedulePtyResize();
+        }
+        terminal.style.fontSize = settings.fontSize + "px";
+        setFontSizeVal.textContent = settings.fontSize + "px";
+      }
+      function syncSettingsInputs() {
+        setFollowCwd.checked = !!settings.sftpFollowCwd;
+        setInjectOsc7.checked = !!settings.injectOsc7;
+        setFontSizeInput.value = settings.fontSize;
+      }
+
       function localize() {
         btnClear.textContent = text.clear;
         btnCancel.textContent = text.cancel;
@@ -347,6 +401,11 @@
         btnRefresh.textContent = text.refresh;
         btnMkdir.textContent = text.mkdir;
         btnUpload.textContent = text.upload;
+        setPanelTitle.textContent = text.setPanelTitle;
+        setFollowLabel.textContent = text.setFollow;
+        setInjectLabel.textContent = text.setInject;
+        setFontSizeLabel.textContent = text.setFontSize;
+        setNote.textContent = text.setNote;
         $("emptyTitle").textContent = text.emptyTitle;
         $("emptyText").textContent = text.emptyText;
         if (!running) badge.textContent = dot.className.includes("err") ? text.disconnected : text.ready;
@@ -542,7 +601,7 @@
         ptyHost.hidden = false;
         term = new Terminal({
           cursorBlink: true,
-          fontSize: 12.5,
+          fontSize: settings.fontSize,
           fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
           scrollback: 5000,
           theme: {
@@ -585,6 +644,7 @@
           remoteCwd = cwd || "/";
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
+          try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.injectOsc7 }).catch(() => {}); } catch (_) {}
           // 文件面板走 SFTP，只有 SSH 会话可用
           tabFiles.hidden = sessionKind !== "ssh";
           if (info.pty || sessionKind === "ssh") {
@@ -681,7 +741,7 @@
         const method = event && event.method;
         const params = (event && event.params) || {};
         ptyHost.dataset.dbg = method + "|" + (ptyMode ? "pty" : "legacy") + "|" + (termReady ? "ready" : "notready") + "|" + Date.now();
-        if (method !== "shell/output" && method !== "shell/exit" && method !== "shell/pty-closed" && method !== "shell/legacy-fallback") return;
+        if (method !== "shell/output" && method !== "shell/exit" && method !== "shell/pty-closed" && method !== "shell/legacy-fallback" && method !== "shell/cwd-changed") return;
         if (params.connectionId !== connectionId) return;
         if (method === "shell/output") {
           const bytes = base64ToBytes(params.data || "");
@@ -693,6 +753,15 @@
           if (!currentOut || !decoder) return;
           const value = decoder.decode(bytes, { stream: true });
           streamChunk(clean(value));
+          return;
+        }
+        if (method === "shell/cwd-changed") {
+          if (params.connectionId !== connectionId) return;
+          cwd = params.cwd || cwd;
+          remoteCwd = cwd;
+          if (!ptyMode) renderPrompt();
+          // 文件面板跟随终端路径（设置项；SSH 会话才有文件面板）
+          if (settings.sftpFollowCwd && sessionKind === "ssh" && activeTab === "files" && !uploadBusy) scheduleFollowRefresh();
           return;
         }
         if (method === "shell/legacy-fallback") {
@@ -1415,6 +1484,31 @@
         if (term && !window.getSelection()?.toString()) term.focus();
       });
 
+      let followTimer = null;
+      function scheduleFollowRefresh() {
+        clearTimeout(followTimer);
+        followTimer = setTimeout(() => { if (activeTab === "files") openFiles(remoteCwd); }, 800);
+      }
+
+      btnSettings.addEventListener("click", () => {
+        settingsPanel.hidden = !settingsPanel.hidden;
+        if (!settingsPanel.hidden) syncSettingsInputs();
+      });
+      setFollowCwd.addEventListener("change", () => {
+        settings.sftpFollowCwd = setFollowCwd.checked;
+        saveSettings();
+        if (settings.sftpFollowCwd && sessionKind === "ssh" && activeTab === "files") openFiles(remoteCwd);
+      });
+      setInjectOsc7.addEventListener("change", () => {
+        settings.injectOsc7 = setInjectOsc7.checked;
+        saveSettings();
+        try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: settings.injectOsc7 }).catch(() => {}); } catch (_) {}
+      });
+      setFontSizeInput.addEventListener("input", () => {
+        const value = parseFloat(setFontSizeInput.value);
+        if (!isNaN(value)) { settings.fontSize = value; saveSettings(); }
+      });
+
       btnClear.addEventListener("click", () => {
         if (ptyMode && term) { term.clear(); return; }
         clearTerminal();
@@ -1433,6 +1527,8 @@
         localize();
       });
 
+      applySettings();
+      syncSettingsInputs();
       init();
     </script>
   </body>

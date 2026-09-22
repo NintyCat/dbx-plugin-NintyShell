@@ -190,6 +190,45 @@ func fetchRemoteHome(client *ssh.Client) string {
 	return home
 }
 
+// injectOsc7Report appends an OSC 7 cwd reporter to the remote shell's
+// prompt. The injected command echoes briefly and is followed by a clear, so
+// the terminal looks untouched. Unsupported remote shells are skipped.
+func injectOsc7Report(s *shellSession) {
+	session, sessionErr := withTimeout(sshOpTimeout, func() (*ssh.Session, error) {
+		return s.sshClient.NewSession()
+	})
+	if sessionErr != nil {
+		return
+	}
+	out, outputErr := withTimeout(sshOpTimeout, func() ([]byte, error) {
+		return session.Output(`printf '%s' "${SHELL:-}"`)
+	})
+	_ = session.Close()
+	if outputErr != nil {
+		return
+	}
+	shell := strings.TrimSpace(string(out))
+	base := path.Base(shell)
+	var snippet string
+	switch {
+	case strings.Contains(base, "zsh"):
+		snippet = `__dbx_osc7() { printf '\033]7;file://%s\007' "$PWD" }; precmd_functions+=(__dbx_osc7)`
+	case strings.Contains(base, "fish"):
+		snippet = `function __dbx_osc7 --on-event fish_prompt; printf '\033]7;file://%s\007' $PWD; end`
+	case strings.Contains(base, "bash"):
+		snippet = `export PROMPT_COMMAND='printf "\033]7;file://%s\007" "$PWD"'`
+	default:
+		ptyLogf("osc7 inject skipped: unsupported remote shell %q", shell)
+		return
+	}
+	s.ptyWriteMu.Lock()
+	defer s.ptyWriteMu.Unlock()
+	if s.ptyStdin == nil {
+		return
+	}
+	_, _ = s.ptyStdin.Write([]byte(snippet + "\r" + "clear\r"))
+}
+
 func keepaliveLoop(s *shellSession) {
 	defer guardPanic("keepalive")
 	ticker := time.NewTicker(keepaliveInterval)
@@ -256,6 +295,7 @@ func openPTYShell(s *shellSession, emitter eventEmitter) error {
 	s.ptyMutex.Unlock()
 
 	sessionID := s.id
+	scanner := &osc7Scanner{}
 	go func() {
 		defer guardPanic("pty-read")
 		buf := make([]byte, 8192)
@@ -264,6 +304,9 @@ func openPTYShell(s *shellSession, emitter eventEmitter) error {
 			if n > 0 {
 				chunk := make([]byte, n)
 				copy(chunk, buf[:n])
+				if uri := scanner.feed(chunk); uri != "" {
+					emitOsc7Cwd(s, emitter, uri)
+				}
 				_ = emitter.Event("shell/output", map[string]any{
 					"connectionId": sessionID,
 					"data":         chunk,

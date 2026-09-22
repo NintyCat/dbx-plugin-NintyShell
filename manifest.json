@@ -3,7 +3,7 @@
   "manifest_version": 1,
   "id": "com.nintycat.shell",
   "name": "NintyShell",
-  "version": "0.7.8",
+  "version": "0.8.0",
   "publisher": "nintycat",
   "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
   "icon": "assets/plugin.svg",

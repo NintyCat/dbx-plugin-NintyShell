@@ -82,6 +82,9 @@ type shellSession struct {
 	ptyClosed bool // local PTY only: the shell has exited
 	stopping  bool // shutdown() has started: suppress pty-closed events
 
+	injectOsc7   bool // UI setting: report cwd changes from the remote shell
+	osc7Injected bool // the reporter has already been sent for this session
+
 	ptyMutex   sync.Mutex
 	ptySession *ssh.Session
 	ptyStdin   io.WriteCloser
@@ -259,6 +262,8 @@ func (p *plugin) handle(_ dbxpluginsdk.RequestContext, method string, params jso
 		return p.ptyInput(values)
 	case "shell/resize":
 		return p.ptyResize(values)
+	case "shell/config":
+		return p.shellConfig(values)
 	case "sftp/list":
 		return p.sftpList(values)
 	case "sftp/mkdir":
@@ -388,6 +393,26 @@ func (p *plugin) connectLocal(values map[string]any, connectionID string, emitte
 		result["pty"] = true
 	}
 	return session, result, nil
+}
+
+// shellConfig applies UI preferences to the live session. Currently the only
+// backend-relevant one is injectOsc7: report cwd changes from the remote
+// shell by appending an OSC 7 emitter to its prompt.
+func (p *plugin) shellConfig(values map[string]any) (any, *dbxpluginsdk.PluginError) {
+	current, pluginErr := p.sessionFor(values)
+	if pluginErr != nil {
+		return nil, pluginErr
+	}
+	inject, _ := values["injectOsc7"].(bool)
+	current.mutex.Lock()
+	shouldInject := inject && current.kind == "ssh" && !current.osc7Injected
+	current.injectOsc7 = inject
+	current.osc7Injected = current.osc7Injected || shouldInject
+	current.mutex.Unlock()
+	if shouldInject {
+		go injectOsc7Report(current)
+	}
+	return map[string]any{"success": true}, nil
 }
 
 // fallbackSession tears down a silent pseudo console mid-session and switches
@@ -1226,7 +1251,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.7.8"
+	pluginVersion = "0.8.0"
 )
 
 func main() {
