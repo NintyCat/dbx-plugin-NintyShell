@@ -3,9 +3,9 @@
   "manifest_version": 1,
   "id": "com.nintycat.shell",
   "name": "NintyShell",
-  "version": "0.8.2",
+  "version": "0.8.4",
   "publisher": "nintycat",
-  "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands and manage remote files.",
+  "description": "Local shell and SSH/SFTP terminals in the DBX workbench: run commands, manage remote files, and control Docker applications.",
   "icon": "assets/plugin.svg",
   "engines": {
     "dbx": ">=0.5.68",
@@ -64,7 +64,7 @@
       "label": "SSH / SFTP",
       "icon": "assets/plugin.svg",
       "database_type": "ssh",
-      "description": "Remote shell terminal and SFTP file manager over SSH.",
+      "description": "Remote shell terminal, SFTP file manager, and Docker control panel over SSH.",
       "fields": [
         {
           "key": "display_name",
@@ -93,7 +93,7 @@
           "key": "username",
           "label": "Username",
           "type": "text",
-          "placeholder": "root",
+          "placeholder": "user",
           "binding": "username",
           "required": true
         },
@@ -141,7 +141,7 @@
       "type": "workbench",
       "id": "com.nintycat.shell.workbench",
       "label": "Shell terminal",
-      "description": "Terminal and file manager UI for shell connections.",
+      "description": "Terminal, file manager, and Docker control UI for shell connections.",
       "icon": "assets/plugin.svg"
     },
     {
@@ -157,7 +157,7 @@
   "localizations": {
     "zh-CN": {
       "name": "NintyShell",
-      "description": "在 DBX 工作台中打开本地 Shell 与 SSH/SFTP 终端，执行命令并管理远程文件。",
+      "description": "在 DBX 工作台中打开本地 Shell 与 SSH/SFTP 终端，执行命令、管理远程文件并控制 Docker 应用。",
       "contributions": {
         "com.nintycat.shell.connection": {
           "label": "本地 Shell",
@@ -177,12 +177,12 @@
         },
         "com.nintycat.ssh.connection": {
           "label": "SSH / SFTP 连接",
-          "description": "通过 SSH 打开远程终端与 SFTP 文件管理。",
+          "description": "通过 SSH 打开远程终端、SFTP 文件管理与 Docker 控制面板。",
           "fields": {
             "display_name": { "label": "连接名称" },
             "host": { "label": "主机", "placeholder": "192.168.1.10" },
             "port": { "label": "端口" },
-            "username": { "label": "用户名", "placeholder": "root" },
+            "username": { "label": "用户名", "placeholder": "user" },
             "auth_type": { "label": "认证方式" },
             "password": { "label": "密码" },
             "key_path": {
@@ -195,7 +195,7 @@
         },
         "com.nintycat.shell.workbench": {
           "label": "Shell 终端",
-          "description": "Shell 连接的终端与文件工作台。"
+          "description": "Shell 连接的终端、文件与 Docker 工作台。"
         },
         "com.nintycat.shell.fs": {
           "label": "SFTP 文件"

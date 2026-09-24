@@ -36,12 +36,16 @@ const (
 	metaReadGracePeriod = 1500 * time.Millisecond
 	maxCompletionItems  = 200
 	maxCommandItems     = 12
-	sshDialTimeout      = 10 * time.Second
-	sshOpTimeout        = 10 * time.Second
-	keepaliveInterval   = 30 * time.Second
-	sftpListLimit       = 500
-	providerLocal       = "com.nintycat.shell.connection"
-	providerSSH         = "com.nintycat.ssh.connection"
+	// The host cancels plugin requests after 10 seconds. Keep the network
+	// dial and channel-open phases well below that ceiling so connection/connect
+	// can still run its local PTY setup before the host deadline.
+	sshDialTimeout        = 7 * time.Second
+	sshSessionOpenTimeout = 2 * time.Second
+	sshOpTimeout          = 10 * time.Second
+	keepaliveInterval     = 30 * time.Second
+	sftpListLimit         = 500
+	providerLocal         = "com.nintycat.shell.connection"
+	providerSSH           = "com.nintycat.ssh.connection"
 )
 
 // defaultShellPath picks the shell used when the connection form leaves the
@@ -75,6 +79,17 @@ type shellSession struct {
 	sshClient *ssh.Client
 	sftpMutex sync.Mutex
 	sftpConn  *sftp.Client
+
+	// Optional root escalation for servers that prohibit direct root SSH.
+	// The password lives only on this in-memory session and is never written
+	// into remote command strings or plugin logs.
+	rootEnabled     bool
+	rootUser        string
+	rootPassword    string
+	rootHome        string
+	rootSFTPPath    string
+	rootSFTPConn    *sftp.Client
+	rootSFTPSession *ssh.Session
 
 	// Local interactive terminal: set when the session runs as a real PTY
 	// (nil in the per-command exec fallback used when no PTY is available).
@@ -212,6 +227,15 @@ func (s *shellSession) shutdown() {
 			_ = s.sftpConn.Close()
 			s.sftpConn = nil
 		}
+		if s.rootSFTPConn != nil {
+			_ = s.rootSFTPConn.Close()
+			s.rootSFTPConn = nil
+		}
+		if s.rootSFTPSession != nil {
+			_ = s.rootSFTPSession.Close()
+			s.rootSFTPSession = nil
+		}
+		s.rootPassword = ""
 		s.sftpMutex.Unlock()
 		s.markDead()
 	}
@@ -280,6 +304,20 @@ func (p *plugin) handle(_ dbxpluginsdk.RequestContext, method string, params jso
 		return p.sftpUploadEnd(values)
 	case "sftp/download":
 		return p.sftpDownload(values)
+	case "docker/detect":
+		return p.dockerDetect(values)
+	case "docker/overview":
+		return p.dockerOverview(values)
+	case "docker/container":
+		return p.dockerContainerAction(values)
+	case "docker/containerDetails":
+		return p.dockerContainerDetails(values)
+	case "docker/logs":
+		return p.dockerContainerLogs(values)
+	case "docker/image":
+		return p.dockerImageAction(values)
+	case "docker/imageDetails":
+		return p.dockerImageDetails(values)
 	case "filesystem/list":
 		return p.fsList(values)
 	case "filesystem/read":
@@ -1255,7 +1293,7 @@ func randomHex(bytesCount int) string {
 // Sidecar 身份必须与包根 manifest.json 完全一致（由 version_test.go 守护）
 const (
 	pluginID      = "com.nintycat.shell"
-	pluginVersion = "0.8.2"
+	pluginVersion = "0.8.4"
 )
 
 func main() {

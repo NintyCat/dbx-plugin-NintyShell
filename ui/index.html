@@ -31,7 +31,7 @@
       .actions { display: flex; gap: 8px; flex: none; }
       button.active { background: color-mix(in srgb, CanvasText 8%, transparent); border-color: color-mix(in srgb, CanvasText 30%, transparent); }
       #contentRow { flex: 1; min-height: 0; display: flex; }
-      #settingsPanel { position: fixed; top: 48px; right: 10px; z-index: 30; width: 300px; padding: 12px 14px; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 12px; background: var(--color-background, Canvas); box-shadow: 0 10px 36px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+      #settingsPanel { position: fixed; top: 48px; right: 10px; z-index: 30; width: 300px; padding: 12px 14px; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 12px; background: Canvas; box-shadow: 0 10px 36px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
       #settingsPanel[hidden] { display: none; }
       #settingsPanel .set-title { font-weight: 600; }
       .set-row { display: flex; align-items: center; gap: 8px; line-height: 1.4; }
@@ -98,12 +98,98 @@
       #filePanel.dragover::after { content: "⬇ " attr(data-drophint); position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 600; color: var(--color-primary, #2563eb); background: color-mix(in srgb, var(--color-primary, #2563eb) 10%, transparent); border: 2px dashed var(--color-primary, #2563eb); border-radius: 12px; z-index: 8; pointer-events: none; }
       #filePanel { position: relative; }
       .file-status.error { color: #e5484d; opacity: 1; }
+      /* docker panel */
+      #dockerPanel { position: relative; flex: none; width: 390px; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px 12px; border-left: 1px solid color-mix(in srgb, CanvasText 14%, transparent); }
+      .docker-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+      .docker-version { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 11px; opacity: .65; }
+      .docker-summary { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+      .docker-chip { padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, CanvasText 7%, transparent); font-size: 11px; }
+      #dockerBody { flex: 1; min-height: 0; overflow-y: auto; padding-right: 2px; }
+      .docker-group + .docker-group { margin-top: 12px; }
+      .docker-group-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 5px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; opacity: .6; }
+      .docker-count { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, CanvasText 10%, transparent); text-align: center; font-size: 10px; }
+      .docker-list { overflow: hidden; border: 1px solid color-mix(in srgb, CanvasText 12%, transparent); border-radius: 10px; }
+      .docker-empty { padding: 12px 10px; text-align: center; font-size: 11px; opacity: .5; }
+      .docker-row { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, CanvasText 7%, transparent); }
+      .docker-row:last-child { border-bottom: 0; }
+      .docker-row:hover { background: color-mix(in srgb, CanvasText 5%, transparent); }
+      .docker-state { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #9e9e9e; }
+      .docker-state.running { background: #30a46c; }
+      .docker-state.paused, .docker-state.restarting { background: #f5a623; }
+      .docker-state.dead, .docker-state.removing, .docker-state.exited { background: #e5484d; }
+      .docker-state.created { background: #8b93a1; }
+      .docker-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+      .docker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600; }
+      .docker-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10.5px; opacity: .55; }
+      .docker-ops { display: flex; gap: 3px; flex: none; }
+      .docker-ops button { padding: 1px 6px; font-size: 11px; border-radius: 6px; }
+      .docker-status { min-height: 18px; padding-top: 7px; font-size: 11px; opacity: .7; }
+      .docker-status.error { color: #e5484d; opacity: 1; }
+      .docker-loading, .docker-missing { flex: 1; min-height: 0; display: grid; place-items: center; padding: 18px; text-align: center; }
+      .docker-loading-content { display: flex; align-items: center; gap: 9px; font-size: 12px; opacity: .75; }
+      .docker-missing-card { max-width: 290px; padding: 18px; border: 1px dashed color-mix(in srgb, CanvasText 20%, transparent); border-radius: 12px; }
+      .docker-missing-icon { display: block; margin-bottom: 8px; font-size: 28px; opacity: .7; }
+      .docker-missing-title { margin: 0 0 7px; font-size: 14px; }
+      .docker-missing-text { margin: 0; font-size: 11.5px; line-height: 1.55; opacity: .7; }
       #empty { flex: 1; display: grid; place-items: center; padding: 24px; }
       .card { max-width: 480px; padding: 28px; border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 16px; text-align: center; }
       .card h2 { margin: 0 0 8px; font-size: 16px; }
       .card p { margin: 0; line-height: 1.65; opacity: .7; }
       .card code { display: block; margin-top: 14px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; opacity: .55; word-break: break-all; }
-      #modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 20; }
+      #modal { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 60; }
+      #dockerLogsModal { position: fixed; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.48); z-index: 50; }
+      .docker-logs-card { width: min(860px, 94vw); height: min(70vh, 720px); min-height: 320px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 14px; background: Canvas; box-shadow: 0 18px 60px rgba(0,0,0,.35); }
+      .docker-logs-head, .docker-logs-footer { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+      .docker-logs-head { border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+      .docker-logs-head h3 { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+      #dockerLogsContent { flex: 1; min-height: 0; margin: 0; padding: 12px 14px; overflow: auto; background: color-mix(in srgb, CanvasText 4%, Canvas); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+      .docker-logs-footer { border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+      #dockerLogsStatus { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: .65; }
+      #dockerLogsStatus.error { color: #e5484d; opacity: 1; }
+      #dockerImageDetailsModal, #dockerContainerDetailsModal { position: fixed; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.5); z-index: 45; }
+      .docker-details-card { width: min(920px, 96vw); height: min(82vh, 820px); min-height: 360px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 14px; background: Canvas; box-shadow: 0 18px 60px rgba(0,0,0,.38); }
+      .docker-details-head, .docker-details-footer { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+      .docker-details-head { border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+      .docker-details-head h3 { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+      .docker-details-footer { border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+      #dockerImageDetailsStatus, #dockerContainerDetailsStatus { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; opacity: .65; }
+      #dockerImageDetailsStatus.error, #dockerContainerDetailsStatus.error { color: #e5484d; opacity: 1; }
+      #dockerImageDetailsContent, #dockerContainerDetailsContent { flex: 1; min-height: 0; padding: 14px; overflow: auto; background: color-mix(in srgb, CanvasText 3%, Canvas); }
+      .docker-details-loading { min-height: 180px; display: grid; place-items: center; }
+      .docker-details-loading .docker-loading-content { font-size: 12.5px; }
+      .docker-details-error { max-width: 620px; margin: 20px auto; padding: 14px; border: 1px dashed color-mix(in srgb, #e5484d 55%, transparent); border-radius: 10px; color: #e5484d; font-size: 12px; line-height: 1.6; text-align: center; }
+      .docker-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 22px; }
+      .docker-detail-pair { min-width: 0; display: grid; grid-template-columns: minmax(92px, auto) minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed color-mix(in srgb, CanvasText 9%, transparent); }
+      .docker-detail-key { font-size: 11px; font-weight: 700; opacity: .58; white-space: nowrap; }
+      .docker-detail-value { min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+      .docker-detail-hero { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; margin-bottom: 12px; border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); border-radius: 12px; background: color-mix(in srgb, CanvasText 5%, Canvas); }
+      .docker-detail-hero .docker-state { width: 11px; height: 11px; margin-top: 5px; }
+      .docker-detail-hero-main { flex: 1; min-width: 0; }
+      .docker-detail-hero-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 16px; font-weight: 700; }
+      .docker-detail-hero-title code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; font-weight: 600; opacity: .72; }
+      .docker-detail-hero-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; font-size: 11.5px; opacity: .72; }
+      .docker-detail-hero-state { flex: none; padding: 4px 9px; border: 1px solid color-mix(in srgb, CanvasText 16%, transparent); border-radius: 999px; background: color-mix(in srgb, CanvasText 7%, Canvas); font-size: 11px; font-weight: 700; }
+      .docker-detail-section { margin-top: 12px; padding: 12px 13px; border: 1px solid color-mix(in srgb, CanvasText 11%, transparent); border-radius: 11px; background: color-mix(in srgb, CanvasText 3%, Canvas); }
+      .docker-detail-section:first-child { margin-top: 0; }
+      .docker-detail-section h4 { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; font-size: 12.5px; }
+      .docker-detail-section h4::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, CanvasText 12%, transparent); }
+      .docker-detail-section > .docker-detail-note:first-of-type { margin-top: 0; }
+      .docker-detail-note { margin: 7px 0 0; font-size: 10.5px; line-height: 1.55; opacity: .6; }
+      .docker-detail-empty { padding: 9px 10px; border: 1px dashed color-mix(in srgb, CanvasText 16%, transparent); border-radius: 8px; font-size: 11px; opacity: .62; }
+      .docker-detail-container { padding: 9px 10px; border: 1px solid color-mix(in srgb, CanvasText 12%, transparent); border-radius: 10px; background: color-mix(in srgb, CanvasText 4%, transparent); }
+      .docker-detail-container + .docker-detail-container { margin-top: 8px; }
+      .docker-detail-container-title { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 700; }
+      .docker-detail-container-title .docker-state { width: 7px; height: 7px; }
+      .docker-detail-chip { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, CanvasText 8%, transparent); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; line-height: 1.5; }
+      .docker-detail-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+      .docker-detail-table { width: 100%; border-collapse: collapse; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.8px; }
+      .docker-detail-table th, .docker-detail-table td { padding: 6px 7px; border-bottom: 1px solid color-mix(in srgb, CanvasText 8%, transparent); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+      .docker-detail-table th { font-weight: 700; opacity: .6; }
+      .docker-detail-table tr:last-child td { border-bottom: 0; }
+      .docker-detail-table code { font: inherit; }
+      .docker-detail-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+      .docker-detail-actions button { padding: 5px 9px; font-size: 11.5px; border-radius: 8px; }
+      .docker-detail-actions .danger { color: #e5484d; }
       .modal-card { width: min(420px, 90vw); padding: 20px; border-radius: 14px; background: var(--color-background, Canvas); border: 1px solid color-mix(in srgb, CanvasText 14%, transparent); box-shadow: 0 18px 60px rgba(0,0,0,.25); }
       .modal-card h3 { margin: 0 0 12px; font-size: 14px; }
       .modal-card input { width: 100%; border: 1px solid color-mix(in srgb, CanvasText 20%, transparent); border-radius: 8px; padding: 7px 10px; background: transparent; color: inherit; font: inherit; font-size: 13px; margin-bottom: 14px; }
@@ -127,6 +213,7 @@
       <div class="meta" id="shellMeta"></div>
       <div class="actions">
         <button id="btnFiles" type="button" hidden></button>
+        <button id="btnDocker" type="button" hidden></button>
         <button id="btnClear" type="button"></button>
         <button id="btnCancel" type="button" disabled></button>
         <button id="btnSettings" type="button" aria-label="settings">⚙</button>
@@ -173,12 +260,79 @@
       </div>
       <input type="file" id="uploadInput" hidden />
     </section>
+    <section id="dockerPanel" hidden>
+      <div class="docker-toolbar">
+        <span class="docker-version" id="dockerVersion"></span>
+        <button id="btnDockerRefresh" type="button"></button>
+      </div>
+      <div class="docker-summary" id="dockerSummary" hidden></div>
+      <div class="docker-loading" id="dockerLoading" hidden>
+        <div class="docker-loading-content"><span class="spinner"></span><span id="dockerLoadingText"></span></div>
+      </div>
+      <div class="docker-missing" id="dockerMissing" hidden>
+        <div class="docker-missing-card">
+          <span class="docker-missing-icon" aria-hidden="true">◌</span>
+          <h3 class="docker-missing-title" id="dockerMissingTitle"></h3>
+          <p class="docker-missing-text" id="dockerMissingText"></p>
+        </div>
+      </div>
+      <div id="dockerBody">
+        <div class="docker-group">
+          <div class="docker-group-title"><span id="dockerContainersTitle"></span><span class="docker-count" id="dockerContainerCount">0</span></div>
+          <div class="docker-list" id="dockerContainerList"></div>
+        </div>
+        <div class="docker-group">
+          <div class="docker-group-title"><span id="dockerImagesTitle"></span><span class="docker-count" id="dockerImageCount">0</span></div>
+          <div class="docker-list" id="dockerImageList"></div>
+        </div>
+      </div>
+      <div class="docker-status" id="dockerStatus"></div>
+    </section>
     </div>
     <div id="empty">
       <div class="card">
         <h2 id="emptyTitle">Shell</h2>
         <p id="emptyText"></p>
         <code id="emptyContext"></code>
+      </div>
+    </div>
+    <div id="dockerLogsModal" hidden role="dialog" aria-modal="true" aria-labelledby="dockerLogsTitle">
+      <div class="docker-logs-card">
+        <div class="docker-logs-head">
+          <h3 id="dockerLogsTitle"></h3>
+          <button id="btnDockerLogsClose" type="button"></button>
+        </div>
+        <pre id="dockerLogsContent"></pre>
+        <div class="docker-logs-footer">
+          <span id="dockerLogsStatus"></span>
+          <button id="btnDockerLogsRefresh" type="button"></button>
+        </div>
+      </div>
+    </div>
+    <div id="dockerImageDetailsModal" hidden role="dialog" aria-modal="true" aria-labelledby="dockerImageDetailsTitle">
+      <div class="docker-details-card">
+        <div class="docker-details-head">
+          <h3 id="dockerImageDetailsTitle"></h3>
+          <button id="btnDockerImageDetailsClose" type="button"></button>
+        </div>
+        <div id="dockerImageDetailsContent" aria-live="polite"></div>
+        <div class="docker-details-footer">
+          <span id="dockerImageDetailsStatus"></span>
+          <button id="btnDockerImageDetailsRefresh" type="button"></button>
+        </div>
+      </div>
+    </div>
+    <div id="dockerContainerDetailsModal" hidden role="dialog" aria-modal="true" aria-labelledby="dockerContainerDetailsTitle">
+      <div class="docker-details-card">
+        <div class="docker-details-head">
+          <h3 id="dockerContainerDetailsTitle"></h3>
+          <button id="btnDockerContainerDetailsClose" type="button"></button>
+        </div>
+        <div id="dockerContainerDetailsContent" aria-live="polite"></div>
+        <div class="docker-details-footer">
+          <span id="dockerContainerDetailsStatus"></span>
+          <button id="btnDockerContainerDetailsRefresh" type="button"></button>
+        </div>
       </div>
     </div>
     <div id="modal" hidden>
@@ -215,7 +369,7 @@
       const $ = (id) => document.getElementById(id);
       const header = $("header"), terminal = $("terminal"), empty = $("empty");
       const dot = $("dot"), badge = $("badge"), connName = $("connName"), shellMeta = $("shellMeta");
-      const btnFiles = $("btnFiles");
+      const btnFiles = $("btnFiles"), btnDocker = $("btnDocker");
       const inputLine = $("inputLine"), input = $("input"), inputPrompt = $("inputPrompt");
       const completionsEl = $("completions");
       const runningLine = $("runningLine"), runningText = $("runningText");
@@ -230,15 +384,138 @@
       const logCount = $("logCount"), logClear = $("logClear");
       const btnGo = $("btnGo"), btnRefresh = $("btnRefresh"), btnMkdir = $("btnMkdir"), btnUpload = $("btnUpload");
       const fileTable = $("fileTable"), fileStatus = $("fileStatus");
+      const dockerPanel = $("dockerPanel"), btnDockerRefresh = $("btnDockerRefresh");
+      const dockerVersion = $("dockerVersion"), dockerSummary = $("dockerSummary");
+      const dockerBody = $("dockerBody"), dockerStatus = $("dockerStatus");
+      const dockerLoading = $("dockerLoading"), dockerLoadingText = $("dockerLoadingText");
+      const dockerMissing = $("dockerMissing"), dockerMissingTitle = $("dockerMissingTitle"), dockerMissingText = $("dockerMissingText");
+      const dockerContainersTitle = $("dockerContainersTitle"), dockerImagesTitle = $("dockerImagesTitle");
+      const dockerContainerCount = $("dockerContainerCount"), dockerImageCount = $("dockerImageCount");
+      const dockerContainerList = $("dockerContainerList"), dockerImageList = $("dockerImageList");
       const uploadInput = $("uploadInput");
       const modal = $("modal"), modalTitle = $("modalTitle"), modalInput = $("modalInput");
       const modalOk = $("modalOk"), modalCancel = $("modalCancel");
+      const dockerLogsModal = $("dockerLogsModal"), dockerLogsTitle = $("dockerLogsTitle");
+      const dockerLogsContent = $("dockerLogsContent"), dockerLogsStatus = $("dockerLogsStatus");
+      const btnDockerLogsClose = $("btnDockerLogsClose"), btnDockerLogsRefresh = $("btnDockerLogsRefresh");
+      const dockerImageDetailsModal = $("dockerImageDetailsModal"), dockerImageDetailsTitle = $("dockerImageDetailsTitle");
+      const dockerImageDetailsContent = $("dockerImageDetailsContent"), dockerImageDetailsStatus = $("dockerImageDetailsStatus");
+      const btnDockerImageDetailsClose = $("btnDockerImageDetailsClose"), btnDockerImageDetailsRefresh = $("btnDockerImageDetailsRefresh");
+      const dockerContainerDetailsModal = $("dockerContainerDetailsModal"), dockerContainerDetailsTitle = $("dockerContainerDetailsTitle");
+      const dockerContainerDetailsContent = $("dockerContainerDetailsContent"), dockerContainerDetailsStatus = $("dockerContainerDetailsStatus");
+      const btnDockerContainerDetailsClose = $("btnDockerContainerDetailsClose"), btnDockerContainerDetailsRefresh = $("btnDockerContainerDetailsRefresh");
 
       const copy = {
         en: {
           ready: "Ready", running: "Running", disconnected: "Disconnected",
           clear: "Clear", cancel: "Interrupt",
           filesBtn: "Files",
+          dockerBtn: "Docker",
+          dockerRefresh: "Refresh",
+          dockerDetecting: "Checking for Docker…",
+          dockerLoading: "Loading Docker resources…",
+          dockerMissingTitle: "Docker is not installed",
+          dockerClient: (v) => "Client " + v,
+          dockerDaemon: (v) => "Daemon " + v,
+          dockerSummary: (c, i) => c + " containers · " + i + " images",
+          dockerContainers: "Containers",
+          dockerImages: "Images",
+          dockerNoContainers: "No containers",
+          dockerNoImages: "No images",
+          dockerStart: "Start container",
+          dockerStop: "Stop container",
+          dockerRestart: "Restart container",
+          dockerRemoveContainer: "Remove container",
+          dockerRemoveImage: "Remove image",
+          dockerLogs: "View logs",
+          dockerLogsTitle: (n) => "Logs · " + n,
+          dockerLogsLoading: "Loading container logs…",
+          dockerNoLogs: "No logs",
+          dockerLogsClose: "Close",
+          dockerLogsRefresh: "Refresh",
+          dockerLogsTail: "Last 200 lines",
+          dockerContainerDetails: "Container details",
+          dockerContainerDetailsTitle: (n) => "Container details · " + n,
+          dockerContainerDetailsLoading: "Reading container state, ports, networks, and runtime information…",
+          dockerContainerDetailsReady: "Grouped into basic information, runtime status, network access, and startup configuration.",
+          dockerContainerDetailsEmpty: "No container details to display.",
+          dockerContainerInfo: "Basic information",
+          dockerDetailRuntime: "Runtime status",
+          dockerDetailConfig: "Start and security configuration",
+          dockerDetailNetworkAccess: "Network and access",
+          dockerDetailEnvironment: "Environment and labels",
+          dockerDetailContainerId: "Container ID",
+          dockerDetailName: "Name",
+          dockerDetailImageId: "Image ID",
+          dockerDetailHostname: "Hostname",
+          dockerDetailPid: "PID",
+          dockerDetailExitCode: "Exit code",
+          dockerDetailStartedAt: "Started at",
+          dockerDetailFinishedAt: "Finished at",
+          dockerDetailRestartPolicy: "Restart policy",
+          dockerDetailRestartCount: "Restart count",
+          dockerDetailNetworkMode: "Network mode",
+          dockerDetailPrivileged: "Privileged",
+          dockerDetailReadonlyRootfs: "Read-only root filesystem",
+          dockerDetailHealth: "Health check",
+          dockerDetailLogPath: "Log path",
+          dockerDetailExecutable: "Executable",
+          dockerDetailMounts: "Mounts",
+          dockerDetailNoMounts: "This container has no mounted volumes or bind mounts.",
+          dockerDetailMountSource: "Source",
+          dockerDetailMountDestination: "Destination",
+          dockerDetailMountMode: "Mode",
+          dockerDetailMountRW: "Writable",
+          dockerDetailActions: "Container actions",
+          dockerDetailActionLoading: "Applying container action…",
+          dockerDetailActionSuccess: "Container action completed and details were refreshed.",
+          dockerDetailYes: "Yes",
+          dockerDetailNo: "No",
+          dockerImageDetails: "Image details",
+          dockerImageDetailsTitle: (n) => "Image details · " + n,
+          dockerImageDetailsLoading: "Reading image details, ports, and network IPs…",
+          dockerImageDetailsReady: "Image metadata, port mappings, container IPs, and host addresses",
+          dockerImageDetailsEmpty: "No image details to display.",
+          dockerImageInfo: "Image information",
+          dockerDetailId: "Image ID",
+          dockerDetailTags: "Repository tags",
+          dockerDetailDigests: "Repository digests",
+          dockerDetailCreated: "Created",
+          dockerDetailBuildDocker: "Built with Docker",
+          dockerDetailPlatform: "Platform",
+          dockerDetailSize: "Size",
+          dockerDetailLayers: "Layers",
+          dockerDetailWorkingDir: "Working directory",
+          dockerDetailUser: "User",
+          dockerDetailEntrypoint: "Entrypoint",
+          dockerDetailCommand: "Command",
+          dockerDetailEnv: "Environment variables",
+          dockerDetailLabels: "Labels",
+          dockerDetailExposed: "Exposed container ports",
+          dockerDetailContainers: "Containers using this image",
+          dockerDetailNoContainers: "No containers are using this image, so there are no runtime port mappings or container network IPs.",
+          dockerDetailPortMappings: "Port mappings and access addresses",
+          dockerDetailNoPorts: "This container has no published host port.",
+          dockerDetailHostIPs: "Docker host network IPs",
+          dockerDetailNoHostIPs: "The host did not report any network IP.",
+          dockerDetailNetworks: "Container network IPs",
+          dockerDetailNoNetworks: "This container is not attached to a Docker network.",
+          dockerDetailState: "State",
+          dockerDetailImage: "Container image",
+          dockerDetailNetwork: "Network",
+          dockerDetailContainerIP: "Container IP",
+          dockerDetailGateway: "Gateway",
+          dockerDetailIPv6: "IPv6",
+          dockerDetailContainerPort: "Container port",
+          dockerDetailHostBinding: "Host binding",
+          dockerDetailAddresses: "Access addresses",
+          dockerDetailExternalNote: "0.0.0.0 means the port listens on all host interfaces. LAN/public reachability still depends on NAT, firewall, and security-group rules; Docker itself does not provide a public IP.",
+          dockerDetailEmptyValue: "—",
+          dockerDetailLayersValue: (n) => n + " layers",
+          dockerConfirmContainer: (n) => "Remove container " + n + "? This cannot be undone.",
+          dockerConfirmImage: (n) => "Remove image " + n + "? This cannot be undone.",
+          dockerNotInstalled: "Docker is not installed on this remote host.",
+          dockerDaemonDown: (m) => "Docker daemon is unavailable: " + m,
           go: "Go", refresh: "Refresh", mkdir: "New folder", upload: "Upload",
           colName: "Name", colSize: "Size", colTime: "Modified", opDownload: "Download", opDelete: "Delete", opRename: "Rename",
           parentDir: ".. (parent)",
@@ -289,6 +566,112 @@
           ready: "就绪", running: "执行中", disconnected: "未连接",
           clear: "清屏", cancel: "中断",
           filesBtn: "文件",
+          dockerBtn: "Docker",
+          dockerRefresh: "刷新",
+          dockerDetecting: "正在检查 Docker…",
+          dockerLoading: "正在读取 Docker 资源…",
+          dockerMissingTitle: "未安装 Docker",
+          dockerClient: (v) => "客户端 " + v,
+          dockerDaemon: (v) => "守护进程 " + v,
+          dockerSummary: (c, i) => c + " 个容器 · " + i + " 个镜像",
+          dockerContainers: "容器",
+          dockerImages: "镜像",
+          dockerNoContainers: "暂无容器",
+          dockerNoImages: "暂无镜像",
+          dockerStart: "启动容器",
+          dockerStop: "停止容器",
+          dockerRestart: "重启容器",
+          dockerRemoveContainer: "删除容器",
+          dockerRemoveImage: "删除镜像",
+          dockerLogs: "查看日志",
+          dockerLogsTitle: (n) => "日志 · " + n,
+          dockerLogsLoading: "正在读取容器日志…",
+          dockerNoLogs: "暂无日志",
+          dockerLogsClose: "关闭",
+          dockerLogsRefresh: "刷新",
+          dockerLogsTail: "最近 200 行",
+          dockerContainerDetails: "容器详情",
+          dockerContainerDetailsTitle: (n) => "容器详情 · " + n,
+          dockerContainerDetailsLoading: "正在读取容器状态、端口、网络与运行信息…",
+          dockerContainerDetailsReady: "已按基础信息、运行状态、网络访问和启动配置分组显示。",
+          dockerContainerDetailsEmpty: "暂无可显示的容器详情。",
+          dockerContainerInfo: "基础信息",
+          dockerDetailRuntime: "运行状态",
+          dockerDetailConfig: "启动与安全配置",
+          dockerDetailNetworkAccess: "网络与访问",
+          dockerDetailEnvironment: "环境变量与标签",
+          dockerDetailContainerId: "容器 ID",
+          dockerDetailName: "容器名称",
+          dockerDetailImageId: "镜像 ID",
+          dockerDetailHostname: "主机名",
+          dockerDetailPid: "进程 PID",
+          dockerDetailExitCode: "退出码",
+          dockerDetailStartedAt: "启动时间",
+          dockerDetailFinishedAt: "结束时间",
+          dockerDetailRestartPolicy: "重启策略",
+          dockerDetailRestartCount: "重启次数",
+          dockerDetailNetworkMode: "网络模式",
+          dockerDetailPrivileged: "特权模式",
+          dockerDetailReadonlyRootfs: "只读根文件系统",
+          dockerDetailHealth: "健康检查",
+          dockerDetailLogPath: "日志路径",
+          dockerDetailExecutable: "可执行文件",
+          dockerDetailMounts: "挂载",
+          dockerDetailNoMounts: "该容器没有挂载卷或绑定目录。",
+          dockerDetailMountSource: "宿主机路径",
+          dockerDetailMountDestination: "容器路径",
+          dockerDetailMountMode: "挂载模式",
+          dockerDetailMountRW: "可写",
+          dockerDetailActions: "容器操作",
+          dockerDetailActionLoading: "正在执行容器操作…",
+          dockerDetailActionSuccess: "容器操作已完成，详情已刷新。",
+          dockerDetailYes: "是",
+          dockerDetailNo: "否",
+          dockerImageDetails: "镜像详情",
+          dockerImageDetailsTitle: (n) => "镜像详情 · " + n,
+          dockerImageDetailsLoading: "正在读取镜像详情、端口映射与网络 IP…",
+          dockerImageDetailsReady: "已包含镜像信息、端口映射、容器 IP 与主机地址",
+          dockerImageDetailsEmpty: "暂无可显示的镜像详情。",
+          dockerImageInfo: "镜像信息",
+          dockerDetailId: "镜像 ID",
+          dockerDetailTags: "仓库标签",
+          dockerDetailDigests: "仓库摘要",
+          dockerDetailCreated: "创建时间",
+          dockerDetailBuildDocker: "构建 Docker 版本",
+          dockerDetailPlatform: "平台",
+          dockerDetailSize: "大小",
+          dockerDetailLayers: "分层",
+          dockerDetailWorkingDir: "工作目录",
+          dockerDetailUser: "运行用户",
+          dockerDetailEntrypoint: "入口命令",
+          dockerDetailCommand: "启动命令",
+          dockerDetailEnv: "环境变量",
+          dockerDetailLabels: "标签",
+          dockerDetailExposed: "镜像暴露的容器端口",
+          dockerDetailContainers: "使用此镜像的容器",
+          dockerDetailNoContainers: "当前没有容器使用此镜像，因此没有运行时端口映射和容器网络 IP。",
+          dockerDetailPortMappings: "端口映射与访问地址",
+          dockerDetailNoPorts: "该容器没有发布到宿主机的端口。",
+          dockerDetailHostIPs: "Docker 主机网络 IP",
+          dockerDetailNoHostIPs: "主机未报告网络 IP。",
+          dockerDetailNetworks: "容器网络 IP",
+          dockerDetailNoNetworks: "该容器未连接 Docker 网络。",
+          dockerDetailState: "状态",
+          dockerDetailImage: "容器镜像",
+          dockerDetailNetwork: "网络",
+          dockerDetailContainerIP: "容器 IP",
+          dockerDetailGateway: "网关",
+          dockerDetailIPv6: "IPv6",
+          dockerDetailContainerPort: "容器端口",
+          dockerDetailHostBinding: "宿主机绑定",
+          dockerDetailAddresses: "可访问地址",
+          dockerDetailExternalNote: "0.0.0.0 表示端口监听主机所有网络接口；能否从局域网或公网访问仍取决于 NAT、防火墙和安全组规则，Docker 本身不会提供公网 IP。",
+          dockerDetailEmptyValue: "—",
+          dockerDetailLayersValue: (n) => n + " 层",
+          dockerConfirmContainer: (n) => "确定删除容器 " + n + " ？此操作不可撤销。",
+          dockerConfirmImage: (n) => "确定删除镜像 " + n + " ？此操作不可撤销。",
+          dockerNotInstalled: "远程主机未安装 Docker。",
+          dockerDaemonDown: (m) => "Docker 守护进程不可用：" + m,
           go: "转到", refresh: "刷新", mkdir: "新建目录", upload: "上传",
           colName: "名称", colSize: "大小", colTime: "修改时间", opDownload: "下载", opDelete: "删除", opRename: "重命名",
           parentDir: ".. (上级目录)",
@@ -353,6 +736,29 @@
       let draft = "";
 
       let filePanelOpen = false;
+      let dockerPanelOpen = false;
+      let dockerAvailable = false;
+      let dockerBusy = false;
+      let lastDockerOverview = null;
+      let dockerPanelState = "idle";
+      let dockerLogsContainerId = null;
+      let dockerLogsName = "";
+      let dockerLogsBusy = false;
+      let dockerLogsGeneration = 0;
+      let dockerLogsState = "";
+      let dockerImageDetailsId = null;
+      let dockerImageDetailsName = "";
+      let dockerImageDetailsBusy = false;
+      let dockerImageDetailsGeneration = 0;
+      let dockerImageDetailsState = "";
+      let dockerImageDetailsResult = null;
+      let dockerContainerDetailsId = null;
+      let dockerContainerDetailsName = "";
+      let dockerContainerDetailsBusy = false;
+      let dockerContainerDetailsActionBusy = false;
+      let dockerContainerDetailsGeneration = 0;
+      let dockerContainerDetailsState = "";
+      let dockerContainerDetailsResult = null;
       let remoteCwd = "/";
       let uploadBusy = false;
 
@@ -408,6 +814,8 @@
         btnCancel.textContent = text.cancel;
         runningText.textContent = text.runningText;
         btnFiles.textContent = text.filesBtn;
+        btnDocker.textContent = text.dockerBtn;
+        updateDockerLabels();
         logTitle.textContent = text.logTitle;
         logClear.textContent = text.logClear;
         btnGo.textContent = text.go;
@@ -441,12 +849,15 @@
       // Terminal is the main view; the file panel is a sidebar toggled by the
       // 📂 button (SFTP, SSH sessions only).
       function applyView() {
+        const sidebarOpen = filePanelOpen || dockerPanelOpen;
         terminal.hidden = ptyMode;
         ptyHost.hidden = !ptyMode;
         filePanel.hidden = !filePanelOpen;
+        dockerPanel.hidden = !dockerPanelOpen;
         btnFiles.classList.toggle("active", filePanelOpen);
+        btnDocker.classList.toggle("active", dockerPanelOpen);
         schedulePtyResize();
-        if (!filePanelOpen) {
+        if (!sidebarOpen) {
           if (ptyMode) {
             if (term) term.focus();
           } else if (!running) {
@@ -457,11 +868,30 @@
 
       function toggleFilePanel() {
         filePanelOpen = !filePanelOpen;
+        if (filePanelOpen) {
+          dockerPanelOpen = false;
+          closeDockerLogs();
+          closeDockerImageDetails();
+          closeDockerContainerDetails();
+        }
         applyView();
         if (filePanelOpen) openFiles(remoteCwd);
       }
 
+      function toggleDockerPanel() {
+        dockerPanelOpen = !dockerPanelOpen;
+        if (dockerPanelOpen) filePanelOpen = false;
+        else {
+          closeDockerLogs();
+          closeDockerImageDetails();
+          closeDockerContainerDetails();
+        }
+        applyView();
+        if (dockerPanelOpen) startDockerPanel();
+      }
+
       btnFiles.addEventListener("click", toggleFilePanel);
+      btnDocker.addEventListener("click", toggleDockerPanel);
 
       // ---- terminal ----
 
@@ -551,6 +981,9 @@
       }
 
       function setDisconnected() {
+        closeDockerLogs();
+        closeDockerImageDetails();
+        closeDockerContainerDetails();
         dot.className = "dot err";
         badge.textContent = text.disconnected;
       }
@@ -662,18 +1095,23 @@
           connName.textContent = window.dbxPlugin.context?.connectionName || window.dbxPlugin.context?.name || "Shell";
           shellMeta.textContent = shellPath || "ssh";
           try { window.dbxPlugin.invoke("shell/config", { connectionId, injectOsc7: !!settings.sftpFollowCwd }).catch(() => {}); } catch (_) {}
-          // 文件侧边栏走 SFTP，只有 SSH 会话可用；SSH 默认展开并联动
+          // SSH 连接时不做 Docker 检测，只显示按钮；点击按钮后再检测并加载。
           btnFiles.hidden = sessionKind !== "ssh";
           btnJump.hidden = sessionKind !== "ssh";
           btnFollow.hidden = sessionKind !== "ssh";
-          filePanelOpen = sessionKind === "ssh";
+          btnDocker.hidden = true;
+          dockerAvailable = false;
+          dockerPanelOpen = false;
+          filePanelOpen = false;
+          lastDockerOverview = null;
+          setDockerPanelState("idle");
           if (info.pty || sessionKind === "ssh") {
             initPTY();
             applyView();
             dot.className = "dot ok";
             badge.textContent = text.ready;
             setRunning(false);
-            if (sessionKind === "ssh") openFiles(remoteCwd);
+            if (sessionKind === "ssh") await setupSSHSidebar();
           } else {
             applyView();
             renderPrompt();
@@ -824,9 +1262,13 @@
       }
 
       function showEmptyState(extra) {
+        closeDockerLogs();
+        closeDockerImageDetails();
+        closeDockerContainerDetails();
         header.hidden = true;
         terminal.hidden = true;
         filePanel.hidden = true;
+        dockerPanel.hidden = true;
         empty.hidden = false;
         $("emptyContext").textContent = extra || "";
       }
@@ -991,6 +1433,1040 @@
         }
         await requestCompletions();
       }
+
+      // ---- Docker control panel ----
+      // SSH sessions leave the Docker button visible without probing. The
+      // panel performs detection and loading only when the user opens it.
+
+      function dockerStatusLine(message, isError) {
+        dockerStatus.textContent = message || "";
+        dockerStatus.className = "docker-status" + (isError ? " error" : "");
+      }
+
+      function setDockerPanelState(state, message) {
+        dockerPanelState = state;
+        dockerLoading.hidden = state !== "loading";
+        dockerMissing.hidden = state !== "missing";
+        dockerBody.hidden = state !== "ready";
+        dockerSummary.hidden = state !== "ready";
+        dockerPanel.setAttribute("aria-busy", state === "loading" ? "true" : "false");
+        if (state === "loading") {
+          dockerLoadingText.textContent = message || text.dockerDetecting;
+          dockerVersion.textContent = "";
+          dockerVersion.title = "";
+        } else if (state === "missing") {
+          dockerMissingTitle.textContent = text.dockerMissingTitle;
+          dockerMissingText.textContent = message || text.dockerNotInstalled;
+          dockerVersion.textContent = "";
+          dockerVersion.title = "";
+        }
+      }
+
+      function showDockerMissing(message) {
+        dockerAvailable = false;
+        lastDockerOverview = null;
+        setDockerPanelState("missing", message || text.dockerNotInstalled);
+        dockerStatusLine(message || text.dockerNotInstalled, true);
+      }
+
+      function updateDockerLabels() {
+        btnDockerRefresh.textContent = text.dockerRefresh;
+        btnDockerLogsClose.textContent = text.dockerLogsClose;
+        btnDockerLogsRefresh.textContent = text.dockerLogsRefresh;
+        btnDockerImageDetailsClose.textContent = text.dockerLogsClose;
+        btnDockerImageDetailsRefresh.textContent = text.dockerLogsRefresh;
+        btnDockerContainerDetailsClose.textContent = text.dockerLogsClose;
+        btnDockerContainerDetailsRefresh.textContent = text.dockerLogsRefresh;
+        dockerContainersTitle.textContent = text.dockerContainers;
+        dockerImagesTitle.textContent = text.dockerImages;
+        if (dockerLogsName) dockerLogsTitle.textContent = text.dockerLogsTitle(dockerLogsName);
+        if (dockerLogsState === "loading") setDockerLogsStatus(text.dockerLogsLoading);
+        else if (dockerLogsState === "ready") setDockerLogsStatus(text.dockerLogsTail);
+        if (dockerImageDetailsName) dockerImageDetailsTitle.textContent = text.dockerImageDetailsTitle(dockerImageDetailsName);
+        if (dockerImageDetailsState === "loading") {
+          showDockerImageDetailsLoading();
+          setDockerImageDetailsStatus(text.dockerImageDetailsLoading);
+        }
+        else if (dockerImageDetailsState === "ready") setDockerImageDetailsStatus(text.dockerImageDetailsReady);
+        if (dockerImageDetailsResult) renderDockerImageDetails(dockerImageDetailsResult);
+        if (dockerContainerDetailsName) dockerContainerDetailsTitle.textContent = text.dockerContainerDetailsTitle(dockerContainerDetailsName);
+        if (dockerContainerDetailsState === "loading") {
+          showDockerContainerDetailsLoading();
+          setDockerContainerDetailsStatus(text.dockerContainerDetailsLoading);
+        }
+        else if (dockerContainerDetailsState === "ready") setDockerContainerDetailsStatus(text.dockerContainerDetailsReady);
+        if (dockerContainerDetailsResult) renderDockerContainerDetails(dockerContainerDetailsResult);
+        if (lastDockerOverview) renderDockerOverview(lastDockerOverview);
+      }
+
+      async function setupSSHSidebar() {
+        // Do not probe Docker during connection; the button is always offered
+        // for SSH sessions and detection starts on the first click.
+        closeDockerLogs();
+        closeDockerImageDetails();
+        closeDockerContainerDetails();
+        dockerAvailable = false;
+        lastDockerOverview = null;
+        btnDocker.hidden = false;
+        dockerPanelOpen = false;
+        filePanelOpen = false;
+        setDockerPanelState("idle");
+        dockerStatusLine("");
+        applyView();
+      }
+
+      async function startDockerPanel() {
+        if (dockerBusy) return;
+        dockerBusy = true;
+        setDockerControlsDisabled(true);
+        setDockerPanelState("loading", text.dockerDetecting);
+        dockerStatusLine(text.dockerDetecting);
+        try {
+          const detection = await window.dbxPlugin.invoke("docker/detect", { connectionId });
+          if (!detection || !detection.success) {
+            throw new Error((detection && detection.message) || text.dockerDetecting);
+          }
+          if (!detection.installed) {
+            showDockerMissing();
+            return;
+          }
+
+          dockerAvailable = true;
+          setDockerPanelState("loading", text.dockerLoading);
+          dockerStatusLine(text.dockerLoading);
+          const result = await window.dbxPlugin.invoke("docker/overview", { connectionId });
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerLoading);
+          }
+          if (!result.installed) {
+            showDockerMissing();
+            return;
+          }
+          lastDockerOverview = result;
+          renderDockerOverview(result);
+          setDockerPanelState("ready");
+          if (result.daemon) {
+            dockerStatusLine("");
+          } else {
+            dockerStatusLine(text.dockerDaemonDown(result.message || ""), true);
+          }
+        } catch (error) {
+          lastDockerOverview = null;
+          setDockerPanelState("error");
+          dockerStatusLine(error.message || String(error), true);
+        } finally {
+          dockerBusy = false;
+          setDockerControlsDisabled(false);
+        }
+      }
+
+      async function refreshDocker() {
+        if (dockerBusy) return;
+        dockerBusy = true;
+        setDockerControlsDisabled(true);
+        setDockerPanelState("loading", text.dockerLoading);
+        dockerStatusLine(text.dockerLoading);
+        try {
+          const result = await window.dbxPlugin.invoke("docker/overview", { connectionId });
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerLoading);
+          }
+          if (!result.installed) {
+            showDockerMissing();
+            return;
+          }
+          lastDockerOverview = result;
+          renderDockerOverview(result);
+          setDockerPanelState("ready");
+          if (result.daemon) {
+            dockerStatusLine("");
+          } else {
+            dockerStatusLine(text.dockerDaemonDown(result.message || ""), true);
+          }
+        } catch (error) {
+          lastDockerOverview = null;
+          setDockerPanelState("error");
+          dockerStatusLine(error.message || String(error), true);
+        } finally {
+          dockerBusy = false;
+          setDockerControlsDisabled(false);
+        }
+      }
+
+      function dockerEmptyRow(label) {
+        const row = document.createElement("div");
+        row.className = "docker-empty";
+        row.textContent = label;
+        return row;
+      }
+
+      function dockerActionButton(label, symbol, onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = symbol;
+        button.title = label;
+        button.addEventListener("click", onClick);
+        return button;
+      }
+
+      function dockerRow(state, name, meta, operations) {
+        const row = document.createElement("div");
+        row.className = "docker-row";
+        const dotNode = document.createElement("span");
+        dotNode.className = "docker-state " + (state || "");
+        dotNode.title = state || "";
+        const main = document.createElement("span");
+        main.className = "docker-main";
+        const title = document.createElement("span");
+        title.className = "docker-name";
+        title.textContent = name;
+        title.title = name;
+        const detail = document.createElement("span");
+        detail.className = "docker-meta";
+        detail.textContent = meta;
+        detail.title = meta;
+        main.append(title, detail);
+        const ops = document.createElement("span");
+        ops.className = "docker-ops";
+        ops.append(...operations);
+        row.append(dotNode, main, ops);
+        return row;
+      }
+
+      function renderDockerOverview(result) {
+        const containers = Array.isArray(result.containers) ? result.containers : [];
+        const images = Array.isArray(result.images) ? result.images : [];
+
+        const versionParts = [];
+        if (result.clientVersion) versionParts.push(text.dockerClient(result.clientVersion));
+        if (result.daemon && result.serverVersion) versionParts.push(text.dockerDaemon(result.serverVersion));
+        dockerVersion.textContent = versionParts.join(" · ");
+        dockerVersion.title = versionParts.join(" · ");
+
+        dockerSummary.hidden = false;
+        dockerSummary.replaceChildren();
+        const countChip = document.createElement("span");
+        countChip.className = "docker-chip";
+        countChip.textContent = text.dockerSummary(containers.length, images.length);
+        dockerSummary.appendChild(countChip);
+
+        dockerContainerCount.textContent = String(containers.length);
+        dockerImageCount.textContent = String(images.length);
+        dockerContainersTitle.textContent = text.dockerContainers;
+        dockerImagesTitle.textContent = text.dockerImages;
+        btnDockerRefresh.textContent = text.dockerRefresh;
+
+        dockerContainerList.replaceChildren();
+        if (!containers.length) {
+          dockerContainerList.appendChild(dockerEmptyRow(text.dockerNoContainers));
+        } else {
+          for (const container of containers) {
+            const state = String(container.state || "").toLowerCase();
+            const name = container.names || String(container.id || "").slice(0, 12);
+            const metaParts = [container.image, container.status].filter(Boolean);
+            if (container.ports) metaParts.push(container.ports);
+            const detailsButton = dockerActionButton(
+              text.dockerContainerDetails,
+              "ⓘ",
+              () => openDockerContainerDetails(container.id, name),
+            );
+            dockerContainerList.appendChild(dockerRow(state, name, metaParts.join(" · "), [detailsButton]));
+          }
+        }
+
+        dockerImageList.replaceChildren();
+        if (!images.length) {
+          dockerImageList.appendChild(dockerEmptyRow(text.dockerNoImages));
+        } else {
+          for (const image of images) {
+            const repository = image.repository || "<none>";
+            const tag = image.tag && image.tag !== "<none>" ? ":" + image.tag : "";
+            const label = repository + tag;
+            const metaParts = [image.id ? String(image.id).slice(0, 12) : "", image.size, image.created].filter(Boolean);
+            dockerImageList.appendChild(dockerRow("", label, metaParts.join(" · "), [
+              dockerActionButton(text.dockerImageDetails, "ⓘ", () => openDockerImageDetails(image.id, label)),
+              dockerActionButton(text.dockerRemoveImage, "✕", async () => {
+                if (await confirmModal(text.dockerConfirmImage(label))) {
+                  await runDockerAction("docker/image", image.id, "remove");
+                }
+              }),
+            ]));
+          }
+        }
+
+        if (dockerBusy) setDockerControlsDisabled(true);
+      }
+
+      function setDockerControlsDisabled(disabled) {
+        btnDockerRefresh.disabled = disabled;
+        for (const button of dockerPanel.querySelectorAll(".docker-ops button")) {
+          button.disabled = disabled;
+        }
+      }
+
+      async function runDockerAction(method, id, action) {
+        if (dockerBusy || !validDockerId(id)) return;
+        dockerBusy = true;
+        setDockerControlsDisabled(true);
+        dockerStatusLine(text.dockerLoading);
+        let succeeded = false;
+        try {
+          const result = await window.dbxPlugin.invoke(method, { connectionId, id, action });
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerLoading);
+          }
+          succeeded = true;
+          dockerStatusLine("");
+        } catch (error) {
+          dockerStatusLine(error.message || String(error), true);
+        } finally {
+          dockerBusy = false;
+          setDockerControlsDisabled(false);
+        }
+        if (succeeded) await refreshDocker();
+      }
+
+      function validDockerId(id) {
+        return typeof id === "string" && /^[0-9a-fA-F]{12,64}$/.test(id);
+      }
+
+      function setDockerLogsStatus(message, isError) {
+        dockerLogsStatus.textContent = message || "";
+        dockerLogsStatus.className = isError ? "error" : "";
+      }
+
+      function openDockerLogs(id, name) {
+        if (!validDockerId(id) || dockerLogsBusy) return;
+        dockerLogsContainerId = id;
+        dockerLogsName = name || String(id).slice(0, 12);
+        dockerLogsTitle.textContent = text.dockerLogsTitle(dockerLogsName);
+        dockerLogsContent.textContent = "";
+        dockerLogsState = "";
+        dockerLogsModal.hidden = false;
+        loadDockerLogs();
+      }
+
+      async function loadDockerLogs() {
+        if (dockerLogsBusy || !validDockerId(dockerLogsContainerId)) return;
+        const id = dockerLogsContainerId;
+        const generation = ++dockerLogsGeneration;
+        dockerLogsBusy = true;
+        btnDockerLogsRefresh.disabled = true;
+        dockerLogsState = "loading";
+        setDockerLogsStatus(text.dockerLogsLoading);
+        try {
+          const result = await window.dbxPlugin.invoke("docker/logs", { connectionId, id });
+          if (generation !== dockerLogsGeneration) return;
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerLogsLoading);
+          }
+          const logs = typeof result.logs === "string" ? result.logs : "";
+          dockerLogsContent.textContent = logs ? logs : text.dockerNoLogs;
+          dockerLogsContent.scrollTop = dockerLogsContent.scrollHeight;
+          dockerLogsState = "ready";
+          setDockerLogsStatus(text.dockerLogsTail);
+        } catch (error) {
+          if (generation !== dockerLogsGeneration) return;
+          dockerLogsState = "error";
+          setDockerLogsStatus(error.message || String(error), true);
+        } finally {
+          if (generation === dockerLogsGeneration) {
+            dockerLogsBusy = false;
+            btnDockerLogsRefresh.disabled = false;
+          }
+        }
+      }
+
+      function closeDockerLogs() {
+        dockerLogsGeneration += 1;
+        dockerLogsContainerId = null;
+        dockerLogsName = "";
+        dockerLogsBusy = false;
+        dockerLogsState = "";
+        dockerLogsModal.hidden = true;
+        dockerLogsTitle.textContent = "";
+        dockerLogsContent.textContent = "";
+        setDockerLogsStatus("");
+        btnDockerLogsRefresh.disabled = false;
+      }
+
+      function dockerDetailSection(title) {
+        const section = document.createElement("section");
+        section.className = "docker-detail-section";
+        const heading = document.createElement("h4");
+        heading.textContent = title;
+        section.appendChild(heading);
+        return section;
+      }
+
+      function dockerDetailPair(label, value) {
+        const pair = document.createElement("div");
+        pair.className = "docker-detail-pair";
+        const key = document.createElement("span");
+        key.className = "docker-detail-key";
+        key.textContent = label;
+        const content = document.createElement("span");
+        content.className = "docker-detail-value";
+        content.textContent = value === null || value === undefined || value === "" ? text.dockerDetailEmptyValue : String(value);
+        pair.append(key, content);
+        return pair;
+      }
+
+      function dockerDetailGrid(pairs) {
+        const grid = document.createElement("div");
+        grid.className = "docker-detail-grid";
+        for (const pair of pairs) grid.appendChild(dockerDetailPair(pair[0], pair[1]));
+        return grid;
+      }
+
+      function dockerDetailEmpty(message) {
+        const empty = document.createElement("div");
+        empty.className = "docker-detail-empty";
+        empty.textContent = message;
+        return empty;
+      }
+
+      function dockerDetailChips(values) {
+        const list = Array.isArray(values) ? values.filter(Boolean) : [];
+        if (!list.length) return dockerDetailEmpty(text.dockerDetailEmptyValue);
+        const chips = document.createElement("div");
+        chips.className = "docker-detail-chips";
+        for (const value of list) {
+          const chip = document.createElement("span");
+          chip.className = "docker-detail-chip";
+          chip.textContent = String(value);
+          chip.title = String(value);
+          chips.appendChild(chip);
+        }
+        return chips;
+      }
+
+      function dockerDetailTable(headers, rows) {
+        const table = document.createElement("table");
+        table.className = "docker-detail-table";
+        const head = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        for (const header of headers) {
+          const cell = document.createElement("th");
+          cell.scope = "col";
+          cell.textContent = header;
+          headRow.appendChild(cell);
+        }
+        head.appendChild(headRow);
+        const body = document.createElement("tbody");
+        for (const row of rows) {
+          const tableRow = document.createElement("tr");
+          for (const value of row) {
+            const cell = document.createElement("td");
+            cell.textContent = value === null || value === undefined || value === "" ? text.dockerDetailEmptyValue : String(value);
+            tableRow.appendChild(cell);
+          }
+          body.appendChild(tableRow);
+        }
+        table.append(head, body);
+        return table;
+      }
+
+      function dockerFormatBytes(value) {
+        const bytes = Number(value);
+        if (!Number.isFinite(bytes) || bytes < 0) return text.dockerDetailEmptyValue;
+        if (bytes < 1024) return bytes + " B";
+        const units = ["KB", "MB", "GB", "TB", "PB"];
+        let amount = bytes;
+        let unit = "B";
+        for (const candidate of units) {
+          if (amount < 1024) break;
+          amount /= 1024;
+          unit = candidate;
+        }
+        return (amount >= 100 || Number.isInteger(amount) ? amount.toFixed(0) : amount.toFixed(1)) + " " + unit;
+      }
+
+      function dockerDetailDate(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
+      }
+
+      function dockerBracketAddress(address) {
+        address = String(address || "");
+        return address.includes(":") && !address.startsWith("[") ? "[" + address + "]" : address;
+      }
+
+      function dockerAccessAddresses(port, hostIPs) {
+        const hostPort = String(port.hostPort || "");
+        if (!hostPort) return [];
+        const binding = String(port.hostIp || port.hostIP || "0.0.0.0");
+        const addresses = [dockerBracketAddress(binding) + ":" + hostPort];
+        if (binding === "0.0.0.0" || binding === "::" || binding === "*") {
+          for (const hostIP of Array.isArray(hostIPs) ? hostIPs : []) {
+            if (hostIP) addresses.push(dockerBracketAddress(hostIP) + ":" + hostPort);
+          }
+        }
+        return Array.from(new Set(addresses));
+      }
+
+      function dockerDetailContainerCard(container, hostIPs) {
+        const card = document.createElement("article");
+        card.className = "docker-detail-container";
+        const title = document.createElement("div");
+        title.className = "docker-detail-container-title";
+        const dotNode = document.createElement("span");
+        const state = String(container.state || "").toLowerCase();
+        dotNode.className = "docker-state " + state;
+        dotNode.title = state;
+        const name = document.createElement("span");
+        name.textContent = container.name || String(container.id || "").slice(0, 12);
+        const id = document.createElement("span");
+        id.style.opacity = ".52";
+        id.textContent = String(container.id || "").slice(0, 12);
+        title.append(dotNode, name, id);
+        card.appendChild(title);
+        card.appendChild(dockerDetailGrid([
+          [text.dockerDetailState, container.status || container.state],
+          [text.dockerDetailImage, container.image],
+        ]));
+
+        const ports = Array.isArray(container.ports) ? container.ports : [];
+        const portSection = dockerDetailSection(text.dockerDetailPortMappings);
+        if (ports.length) {
+          const rows = ports.map((port) => {
+            const hostBinding = ((port.hostIp || port.hostIP || "0.0.0.0") + ":" + (port.hostPort || "")).replace(/:$/, "");
+            return [
+              (port.containerPort || "") + (port.protocol ? "/" + port.protocol : ""),
+              hostBinding,
+              dockerAccessAddresses(port, hostIPs).join("\n"),
+            ];
+          });
+          portSection.appendChild(dockerDetailTable(
+            [text.dockerDetailContainerPort, text.dockerDetailHostBinding, text.dockerDetailAddresses],
+            rows,
+          ));
+          const note = document.createElement("p");
+          note.className = "docker-detail-note";
+          note.textContent = text.dockerDetailExternalNote;
+          portSection.appendChild(note);
+        } else {
+          portSection.appendChild(dockerDetailEmpty(text.dockerDetailNoPorts));
+        }
+        card.appendChild(portSection);
+
+        const networks = Array.isArray(container.networks) ? container.networks : [];
+        const networkSection = dockerDetailSection(text.dockerDetailNetworks);
+        if (networks.length) {
+          const rows = networks.map((network) => [
+            (network.network || "") + (network.networkId ? "\n" + String(network.networkId).slice(0, 12) : ""),
+            network.ipAddress,
+            network.gateway,
+            [network.globalIpv6, network.ipv6Gateway].filter(Boolean).join("\n"),
+          ]);
+          networkSection.appendChild(dockerDetailTable(
+            [text.dockerDetailNetwork, text.dockerDetailContainerIP, text.dockerDetailGateway, text.dockerDetailIPv6],
+            rows,
+          ));
+        } else {
+          networkSection.appendChild(dockerDetailEmpty(text.dockerDetailNoNetworks));
+        }
+        card.appendChild(networkSection);
+        return card;
+      }
+
+      function renderDockerImageDetails(details) {
+        dockerImageDetailsContent.replaceChildren();
+        if (!details || typeof details !== "object") {
+          dockerImageDetailsContent.appendChild(dockerDetailEmpty(text.dockerImageDetailsEmpty));
+          return;
+        }
+        const hostIPs = Array.isArray(details.hostIPs) ? details.hostIPs : [];
+        const labels = details.labels && typeof details.labels === "object"
+          ? Object.keys(details.labels).sort().map((key) => key + "=" + details.labels[key])
+          : [];
+        const platform = [details.architecture, details.variant, details.os].filter(Boolean).join("/");
+
+        const info = dockerDetailSection(text.dockerImageInfo);
+        info.appendChild(dockerDetailGrid([
+          [text.dockerDetailId, details.id],
+          [text.dockerDetailTags, (details.repoTags || []).join("\n")],
+          [text.dockerDetailDigests, (details.repoDigests || []).join("\n")],
+          [text.dockerDetailCreated, dockerDetailDate(details.created)],
+          [text.dockerDetailBuildDocker, details.dockerVersion],
+          [text.dockerDetailPlatform, platform],
+          [text.dockerDetailSize, dockerFormatBytes(details.size)],
+          [text.dockerDetailLayers, text.dockerDetailLayersValue(Number(details.layerCount) || 0)],
+          [text.dockerDetailWorkingDir, details.workingDir],
+          [text.dockerDetailUser, details.user],
+          [text.dockerDetailEntrypoint, (details.entrypoint || []).length ? JSON.stringify(details.entrypoint) : ""],
+          [text.dockerDetailCommand, (details.cmd || []).length ? JSON.stringify(details.cmd) : ""],
+          [text.dockerDetailEnv, (details.env || []).join("\n")],
+          [text.dockerDetailLabels, labels.join("\n")],
+        ]));
+        dockerImageDetailsContent.appendChild(info);
+
+        const exposed = dockerDetailSection(text.dockerDetailExposed);
+        exposed.appendChild(dockerDetailChips(details.exposedPorts || []));
+        dockerImageDetailsContent.appendChild(exposed);
+
+        const host = dockerDetailSection(text.dockerDetailHostIPs);
+        host.appendChild(hostIPs.length ? dockerDetailChips(hostIPs) : dockerDetailEmpty(text.dockerDetailNoHostIPs));
+        dockerImageDetailsContent.appendChild(host);
+
+        const containersSection = dockerDetailSection(text.dockerDetailContainers);
+        const containers = Array.isArray(details.containers) ? details.containers : [];
+        if (containers.length) {
+          for (const container of containers) containersSection.appendChild(dockerDetailContainerCard(container, hostIPs));
+        } else {
+          containersSection.appendChild(dockerDetailEmpty(text.dockerDetailNoContainers));
+        }
+        dockerImageDetailsContent.appendChild(containersSection);
+      }
+
+      function setDockerImageDetailsStatus(message, isError) {
+        dockerImageDetailsStatus.textContent = message || "";
+        dockerImageDetailsStatus.className = isError ? "error" : "";
+      }
+
+      function showDockerImageDetailsLoading() {
+        dockerImageDetailsContent.replaceChildren();
+        const loading = document.createElement("div");
+        loading.className = "docker-details-loading";
+        const inner = document.createElement("div");
+        inner.className = "docker-loading-content";
+        const spinner = document.createElement("span");
+        spinner.className = "spinner";
+        const label = document.createElement("span");
+        label.textContent = text.dockerImageDetailsLoading;
+        inner.append(spinner, label);
+        loading.appendChild(inner);
+        dockerImageDetailsContent.appendChild(loading);
+      }
+
+      function showDockerImageDetailsError(message) {
+        dockerImageDetailsContent.replaceChildren();
+        const error = document.createElement("div");
+        error.className = "docker-details-error";
+        error.textContent = message || text.dockerImageDetailsEmpty;
+        dockerImageDetailsContent.appendChild(error);
+      }
+
+      function openDockerImageDetails(id, name) {
+        if (!validDockerId(id) || !dockerImageDetailsModal.hidden) return;
+        dockerImageDetailsId = id;
+        dockerImageDetailsName = name || String(id).slice(0, 12);
+        dockerImageDetailsResult = null;
+        dockerImageDetailsTitle.textContent = text.dockerImageDetailsTitle(dockerImageDetailsName);
+        dockerImageDetailsModal.hidden = false;
+        loadDockerImageDetails();
+      }
+
+      async function loadDockerImageDetails() {
+        if (dockerImageDetailsBusy || !validDockerId(dockerImageDetailsId)) return;
+        const id = dockerImageDetailsId;
+        const generation = ++dockerImageDetailsGeneration;
+        dockerImageDetailsBusy = true;
+        btnDockerImageDetailsRefresh.disabled = true;
+        dockerImageDetailsState = "loading";
+        dockerImageDetailsResult = null;
+        showDockerImageDetailsLoading();
+        setDockerImageDetailsStatus(text.dockerImageDetailsLoading);
+        try {
+          const result = await window.dbxPlugin.invoke("docker/imageDetails", { connectionId, id });
+          if (generation !== dockerImageDetailsGeneration) return;
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerImageDetailsLoading);
+          }
+          dockerImageDetailsResult = result.details || null;
+          renderDockerImageDetails(dockerImageDetailsResult);
+          dockerImageDetailsState = "ready";
+          setDockerImageDetailsStatus(text.dockerImageDetailsReady);
+        } catch (error) {
+          if (generation !== dockerImageDetailsGeneration) return;
+          dockerImageDetailsState = "error";
+          showDockerImageDetailsError(error.message || String(error));
+          setDockerImageDetailsStatus(error.message || String(error), true);
+        } finally {
+          if (generation === dockerImageDetailsGeneration) {
+            dockerImageDetailsBusy = false;
+            btnDockerImageDetailsRefresh.disabled = false;
+          }
+        }
+      }
+
+      function closeDockerImageDetails() {
+        dockerImageDetailsGeneration += 1;
+        dockerImageDetailsId = null;
+        dockerImageDetailsName = "";
+        dockerImageDetailsBusy = false;
+        dockerImageDetailsState = "";
+        dockerImageDetailsResult = null;
+        dockerImageDetailsModal.hidden = true;
+        dockerImageDetailsTitle.textContent = "";
+        dockerImageDetailsContent.replaceChildren();
+        setDockerImageDetailsStatus("");
+        btnDockerImageDetailsRefresh.disabled = false;
+      }
+
+      function dockerDetailActionButton(label, symbol, onClick, danger) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = symbol + " " + label;
+        button.title = label;
+        if (danger) button.className = "danger";
+        button.addEventListener("click", onClick);
+        return button;
+      }
+
+      function setDockerContainerDetailsStatus(message, isError) {
+        dockerContainerDetailsStatus.textContent = message || "";
+        dockerContainerDetailsStatus.className = isError ? "error" : "";
+      }
+
+      function setDockerContainerDetailsControlsDisabled(disabled) {
+        btnDockerContainerDetailsRefresh.disabled = disabled;
+        for (const button of dockerContainerDetailsContent.querySelectorAll(".docker-detail-actions button")) {
+          button.disabled = disabled;
+        }
+      }
+
+      function showDockerContainerDetailsLoading() {
+        dockerContainerDetailsContent.replaceChildren();
+        const loading = document.createElement("div");
+        loading.className = "docker-details-loading";
+        const inner = document.createElement("div");
+        inner.className = "docker-loading-content";
+        const spinner = document.createElement("span");
+        spinner.className = "spinner";
+        const label = document.createElement("span");
+        label.textContent = text.dockerContainerDetailsLoading;
+        inner.append(spinner, label);
+        loading.appendChild(inner);
+        dockerContainerDetailsContent.appendChild(loading);
+      }
+
+      function showDockerContainerDetailsError(message) {
+        dockerContainerDetailsContent.replaceChildren();
+        const error = document.createElement("div");
+        error.className = "docker-details-error";
+        error.textContent = message || text.dockerContainerDetailsEmpty;
+        dockerContainerDetailsContent.appendChild(error);
+      }
+
+      function dockerDetailBoolean(value) {
+        return value ? text.dockerDetailYes : text.dockerDetailNo;
+      }
+
+      function dockerDetailCommand(path, args) {
+        const command = [path || "", ...(Array.isArray(args) ? args : [])].filter(Boolean);
+        return command.length ? command.join(" ") : "";
+      }
+
+      function appendDockerDetailRuntimeSections(parent, container, hostIPs) {
+        const ports = Array.isArray(container.ports) ? container.ports : [];
+        const portSection = dockerDetailSection(text.dockerDetailPortMappings);
+        if (ports.length) {
+          const rows = ports.map((port) => {
+            const hostBinding = ((port.hostIp || port.hostIP || "0.0.0.0") + ":" + (port.hostPort || "")).replace(/:$/, "");
+            return [
+              (port.containerPort || "") + (port.protocol ? "/" + port.protocol : ""),
+              hostBinding,
+              dockerAccessAddresses(port, hostIPs).join("\n"),
+            ];
+          });
+          portSection.appendChild(dockerDetailTable(
+            [text.dockerDetailContainerPort, text.dockerDetailHostBinding, text.dockerDetailAddresses],
+            rows,
+          ));
+          const note = document.createElement("p");
+          note.className = "docker-detail-note";
+          note.textContent = text.dockerDetailExternalNote;
+          portSection.appendChild(note);
+        } else {
+          portSection.appendChild(dockerDetailEmpty(text.dockerDetailNoPorts));
+        }
+        parent.appendChild(portSection);
+
+        const networks = Array.isArray(container.networks) ? container.networks : [];
+        const networkSection = dockerDetailSection(text.dockerDetailNetworks);
+        if (networks.length) {
+          const rows = networks.map((network) => [
+            (network.network || "") + (network.networkId ? "\n" + String(network.networkId).slice(0, 12) : ""),
+            network.ipAddress,
+            network.gateway,
+            [network.globalIpv6, network.ipv6Gateway].filter(Boolean).join("\n"),
+          ]);
+          networkSection.appendChild(dockerDetailTable(
+            [text.dockerDetailNetwork, text.dockerDetailContainerIP, text.dockerDetailGateway, text.dockerDetailIPv6],
+            rows,
+          ));
+        } else {
+          networkSection.appendChild(dockerDetailEmpty(text.dockerDetailNoNetworks));
+        }
+        parent.appendChild(networkSection);
+      }
+
+      function renderDockerContainerDetails(details) {
+        dockerContainerDetailsContent.replaceChildren();
+        if (!details || typeof details !== "object") {
+          dockerContainerDetailsContent.appendChild(dockerDetailEmpty(text.dockerContainerDetailsEmpty));
+          return;
+        }
+        const state = details.state && typeof details.state === "object" ? details.state : {};
+        const stateStatus = String(state.status || "").toLowerCase();
+        const displayState = state.status || text.dockerDetailEmptyValue;
+        const hostIPs = Array.isArray(details.hostIPs) ? details.hostIPs : [];
+
+        // A compact summary makes the most important state visible before the
+        // long list of inspection fields.
+        const hero = document.createElement("div");
+        hero.className = "docker-detail-hero";
+        const heroDot = document.createElement("span");
+        heroDot.className = "docker-state " + stateStatus;
+        heroDot.title = displayState;
+        const heroMain = document.createElement("div");
+        heroMain.className = "docker-detail-hero-main";
+        const heroTitle = document.createElement("div");
+        heroTitle.className = "docker-detail-hero-title";
+        const heroName = document.createElement("span");
+        heroName.textContent = details.name || String(details.id || "").slice(0, 12);
+        const heroId = document.createElement("code");
+        heroId.textContent = String(details.id || "").slice(0, 12);
+        heroTitle.append(heroName, heroId);
+        const heroMeta = document.createElement("div");
+        heroMeta.className = "docker-detail-hero-meta";
+        const heroImage = document.createElement("span");
+        heroImage.textContent = text.dockerDetailImage + ": " + (details.image || text.dockerDetailEmptyValue);
+        const heroHealth = document.createElement("span");
+        heroHealth.textContent = text.dockerDetailHealth + ": " + (state.healthStatus || text.dockerDetailEmptyValue);
+        heroMeta.append(heroImage, heroHealth);
+        heroMain.append(heroTitle, heroMeta);
+        const heroState = document.createElement("span");
+        heroState.className = "docker-detail-hero-state";
+        heroState.textContent = displayState;
+        hero.append(heroDot, heroMain, heroState);
+        dockerContainerDetailsContent.appendChild(hero);
+
+        const actions = dockerDetailSection(text.dockerDetailActions);
+        const actionRow = document.createElement("div");
+        actionRow.className = "docker-detail-actions";
+        actionRow.appendChild(dockerDetailActionButton(text.dockerLogs, "☰", () => {
+          const id = details.id;
+          const name = details.name || String(id || "").slice(0, 12);
+          // Keep the detail dialog open; the logs dialog is stacked above it.
+          openDockerLogs(id, name);
+        }));
+        if (state.running || state.paused || state.restarting) {
+          actionRow.appendChild(dockerDetailActionButton(text.dockerStop, "■", () => runDockerContainerDetailsAction("stop")));
+          actionRow.appendChild(dockerDetailActionButton(text.dockerRestart, "↻", () => runDockerContainerDetailsAction("restart")));
+        } else {
+          actionRow.appendChild(dockerDetailActionButton(text.dockerStart, "▶", () => runDockerContainerDetailsAction("start")));
+        }
+        if (["exited", "created", "dead"].includes(stateStatus)) {
+          actionRow.appendChild(dockerDetailActionButton(
+            text.dockerRemoveContainer,
+            "✕",
+            () => runDockerContainerDetailsAction("remove"),
+            true,
+          ));
+        }
+        actions.appendChild(actionRow);
+        dockerContainerDetailsContent.appendChild(actions);
+
+        const labels = details.labels && typeof details.labels === "object"
+          ? Object.keys(details.labels).sort().map((key) => key + "=" + details.labels[key])
+          : [];
+        const basic = dockerDetailSection(text.dockerContainerInfo);
+        basic.appendChild(dockerDetailGrid([
+          [text.dockerDetailContainerId, details.id],
+          [text.dockerDetailName, details.name],
+          [text.dockerDetailImage, details.image],
+          [text.dockerDetailImageId, details.imageId],
+          [text.dockerDetailCreated, dockerDetailDate(details.created)],
+          [text.dockerDetailHostname, details.hostname],
+          [text.dockerDetailPlatform, details.platform],
+        ]));
+        dockerContainerDetailsContent.appendChild(basic);
+
+        const runtime = dockerDetailSection(text.dockerDetailRuntime);
+        runtime.appendChild(dockerDetailGrid([
+          [text.dockerDetailState, displayState],
+          [text.dockerDetailHealth, state.healthStatus],
+          [text.dockerDetailPid, state.pid],
+          [text.dockerDetailExitCode, state.exitCode],
+          [text.dockerDetailStartedAt, dockerDetailDate(state.startedAt)],
+          [text.dockerDetailFinishedAt, dockerDetailDate(state.finishedAt)],
+          [text.dockerDetailRestartPolicy, details.restartPolicy],
+          [text.dockerDetailRestartCount, details.restartCount],
+          [text.dockerDetailNetworkMode, details.networkMode],
+          [text.dockerDetailLogPath, details.logPath],
+        ]));
+        dockerContainerDetailsContent.appendChild(runtime);
+
+        const network = dockerDetailSection(text.dockerDetailNetworkAccess);
+        network.appendChild(dockerDetailGrid([
+          [text.dockerDetailHostIPs, hostIPs.join("\n")],
+          [text.dockerDetailExposed, (details.exposedPorts || []).join("\n")],
+        ]));
+        dockerContainerDetailsContent.appendChild(network);
+        appendDockerDetailRuntimeSections(dockerContainerDetailsContent, details, hostIPs);
+
+        const config = dockerDetailSection(text.dockerDetailConfig);
+        config.appendChild(dockerDetailGrid([
+          [text.dockerDetailPrivileged, dockerDetailBoolean(details.privileged)],
+          [text.dockerDetailReadonlyRootfs, dockerDetailBoolean(details.readonlyRootfs)],
+          [text.dockerDetailUser, details.user],
+          [text.dockerDetailWorkingDir, details.workingDir],
+          [text.dockerDetailExecutable, details.path],
+          [text.dockerDetailCommand, dockerDetailCommand(details.path, details.args)],
+          [text.dockerDetailEntrypoint, (details.entrypoint || []).length ? JSON.stringify(details.entrypoint) : ""],
+        ]));
+        dockerContainerDetailsContent.appendChild(config);
+
+        const environment = dockerDetailSection(text.dockerDetailEnvironment);
+        environment.appendChild(dockerDetailGrid([
+          [text.dockerDetailEnv, (details.env || []).join("\n")],
+          [text.dockerDetailLabels, labels.join("\n")],
+        ]));
+        dockerContainerDetailsContent.appendChild(environment);
+
+        const mounts = Array.isArray(details.mounts) ? details.mounts : [];
+        const mountSection = dockerDetailSection(text.dockerDetailMounts);
+        if (mounts.length) {
+          mountSection.appendChild(dockerDetailTable(
+            [text.dockerDetailMountSource, text.dockerDetailMountDestination, text.dockerDetailMountMode, text.dockerDetailMountRW],
+            mounts.map((mount) => [
+              mount.name || mount.source,
+              mount.destination,
+              mount.mode || mount.type,
+              dockerDetailBoolean(mount.rw),
+            ]),
+          ));
+        } else {
+          mountSection.appendChild(dockerDetailEmpty(text.dockerDetailNoMounts));
+        }
+        dockerContainerDetailsContent.appendChild(mountSection);
+        setDockerContainerDetailsControlsDisabled(dockerContainerDetailsBusy || dockerContainerDetailsActionBusy);
+      }
+
+      function openDockerContainerDetails(id, name) {
+        if (!validDockerId(id) || !dockerContainerDetailsModal.hidden) return;
+        dockerContainerDetailsId = id;
+        dockerContainerDetailsName = name || String(id).slice(0, 12);
+        dockerContainerDetailsResult = null;
+        dockerContainerDetailsTitle.textContent = text.dockerContainerDetailsTitle(dockerContainerDetailsName);
+        dockerContainerDetailsModal.hidden = false;
+        loadDockerContainerDetails();
+      }
+
+      async function loadDockerContainerDetails() {
+        if (dockerContainerDetailsBusy || dockerContainerDetailsActionBusy || !validDockerId(dockerContainerDetailsId)) return;
+        const id = dockerContainerDetailsId;
+        const generation = ++dockerContainerDetailsGeneration;
+        dockerContainerDetailsBusy = true;
+        setDockerContainerDetailsControlsDisabled(true);
+        dockerContainerDetailsState = "loading";
+        dockerContainerDetailsResult = null;
+        showDockerContainerDetailsLoading();
+        setDockerContainerDetailsStatus(text.dockerContainerDetailsLoading);
+        try {
+          const result = await window.dbxPlugin.invoke("docker/containerDetails", { connectionId, id });
+          if (generation !== dockerContainerDetailsGeneration) return;
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerContainerDetailsLoading);
+          }
+          dockerContainerDetailsResult = result.details || null;
+          renderDockerContainerDetails(dockerContainerDetailsResult);
+          dockerContainerDetailsState = "ready";
+          setDockerContainerDetailsStatus(text.dockerContainerDetailsReady);
+        } catch (error) {
+          if (generation !== dockerContainerDetailsGeneration) return;
+          dockerContainerDetailsState = "error";
+          showDockerContainerDetailsError(error.message || String(error));
+          setDockerContainerDetailsStatus(error.message || String(error), true);
+        } finally {
+          if (generation === dockerContainerDetailsGeneration) {
+            dockerContainerDetailsBusy = false;
+            setDockerContainerDetailsControlsDisabled(dockerContainerDetailsActionBusy);
+          }
+        }
+      }
+
+      async function runDockerContainerDetailsAction(action) {
+        if (
+          dockerContainerDetailsBusy ||
+          dockerContainerDetailsActionBusy ||
+          !validDockerId(dockerContainerDetailsId)
+        ) return;
+        if (action === "remove" && !(await confirmModal(text.dockerConfirmContainer(dockerContainerDetailsName)))) return;
+        const id = dockerContainerDetailsId;
+        const generation = ++dockerContainerDetailsGeneration;
+        dockerContainerDetailsActionBusy = true;
+        setDockerContainerDetailsControlsDisabled(true);
+        setDockerContainerDetailsStatus(text.dockerDetailActionLoading);
+        let succeeded = false;
+        try {
+          const result = await window.dbxPlugin.invoke("docker/container", { connectionId, id, action });
+          if (!result || !result.success) {
+            throw new Error((result && result.message) || text.dockerDetailActionLoading);
+          }
+          succeeded = true;
+        } catch (error) {
+          if (generation === dockerContainerDetailsGeneration) {
+            setDockerContainerDetailsStatus(error.message || String(error), true);
+          }
+        } finally {
+          // Never clear a newer detail action's busy flag if this request was
+          // invalidated by closing the modal and opening another container.
+          if (generation === dockerContainerDetailsGeneration) {
+            dockerContainerDetailsActionBusy = false;
+          }
+        }
+        if (!succeeded || generation !== dockerContainerDetailsGeneration || dockerContainerDetailsModal.hidden) {
+          if (generation === dockerContainerDetailsGeneration) setDockerContainerDetailsControlsDisabled(false);
+          return;
+        }
+        if (action === "remove") {
+          closeDockerContainerDetails();
+          await refreshDocker();
+          return;
+        }
+        setDockerContainerDetailsStatus(text.dockerDetailActionSuccess);
+        await refreshDocker();
+        await loadDockerContainerDetails();
+      }
+
+      function closeDockerContainerDetails() {
+        dockerContainerDetailsGeneration += 1;
+        dockerContainerDetailsId = null;
+        dockerContainerDetailsName = "";
+        dockerContainerDetailsBusy = false;
+        dockerContainerDetailsActionBusy = false;
+        dockerContainerDetailsState = "";
+        dockerContainerDetailsResult = null;
+        dockerContainerDetailsModal.hidden = true;
+        dockerContainerDetailsTitle.textContent = "";
+        dockerContainerDetailsContent.replaceChildren();
+        setDockerContainerDetailsStatus("");
+        btnDockerContainerDetailsRefresh.disabled = false;
+      }
+
+      btnDockerRefresh.addEventListener("click", () => {
+        if (dockerPanelState === "ready" && dockerAvailable) refreshDocker();
+        else startDockerPanel();
+      });
+      btnDockerLogsClose.addEventListener("click", closeDockerLogs);
+      btnDockerLogsRefresh.addEventListener("click", loadDockerLogs);
+      dockerLogsModal.addEventListener("click", (event) => {
+        if (event.target === dockerLogsModal) closeDockerLogs();
+      });
+      btnDockerImageDetailsClose.addEventListener("click", closeDockerImageDetails);
+      btnDockerImageDetailsRefresh.addEventListener("click", loadDockerImageDetails);
+      dockerImageDetailsModal.addEventListener("click", (event) => {
+        if (event.target === dockerImageDetailsModal) closeDockerImageDetails();
+      });
+      btnDockerContainerDetailsClose.addEventListener("click", closeDockerContainerDetails);
+      btnDockerContainerDetailsRefresh.addEventListener("click", loadDockerContainerDetails);
+      dockerContainerDetailsModal.addEventListener("click", (event) => {
+        if (event.target === dockerContainerDetailsModal) closeDockerContainerDetails();
+      });
 
       // ---- file panel ----
 
@@ -1248,14 +2724,16 @@
         applyLogState();
       });
 
-      async function uploadFile(file) {
+      // 统一上传核心：readChunk(offset, length) 返回 { dataBase64, length, eof }。
+      // 浏览器 File 切片与桌面端 fileTransfer 读句柄都走这条路径，分块流式传输。
+      async function uploadToRemote(name, size, readChunk) {
         if (uploadBusy) {
           logEntry(text.uploadBusy, "err");
           return;
         }
         uploadBusy = true;
-        const target = joinRemote(remoteCwd, file.name);
-        const line = logEntry(text.uploading(0, file.size), "prog");
+        const target = joinRemote(remoteCwd, name);
+        const line = logEntry(text.uploading(0, size), "prog");
         const bar = document.createElement("div");
         bar.className = "log-bar";
         const fill = document.createElement("div");
@@ -1265,25 +2743,24 @@
         line.lastChild.appendChild(bar);
         try {
           const begin = await window.dbxPlugin.invoke("sftp/uploadBegin", { connectionId, path: target });
-          const buffer = new Uint8Array(await file.arrayBuffer());
           const chunkSize = 512 * 1024;
           let offset = 0;
-          while (offset < buffer.length || offset === 0) {
-            const end = Math.min(offset + chunkSize, buffer.length);
+          for (;;) {
+            const chunk = await readChunk(offset, chunkSize);
             await window.dbxPlugin.invoke("sftp/uploadChunk", {
               connectionId,
               uploadId: begin.uploadId,
-              data: bytesToBase64(buffer.subarray(offset, end)),
+              data: chunk.dataBase64,
             });
-            offset = end;
-            const pct = Math.round(offset / Math.max(1, buffer.length) * 100);
-            line.lastChild.firstChild.textContent = text.uploading(offset, buffer.length);
+            offset += chunk.length;
+            const pct = Math.min(100, Math.round(offset / Math.max(1, size) * 100));
+            line.lastChild.firstChild.textContent = text.uploading(offset, size);
             fill.style.width = pct + "%";
-            if (end >= buffer.length) break;
+            if (chunk.eof || !chunk.length) break;
           }
           await window.dbxPlugin.invoke("sftp/uploadEnd", { connectionId, uploadId: begin.uploadId });
           line.className = "log-line ok";
-          line.lastChild.firstChild.textContent = text.logUploadDone(target, formatSize(buffer.length));
+          line.lastChild.firstChild.textContent = text.logUploadDone(target, formatSize(size));
           fill.style.width = "100%";
           fileStatusLine(text.uploaded(target));
           openFiles(remoteCwd);
@@ -1295,6 +2772,13 @@
         }
       }
 
+      async function uploadFile(file) {
+        await uploadToRemote(file.name, file.size, async (offset, length) => {
+          const bytes = new Uint8Array(await file.slice(offset, offset + length).arrayBuffer());
+          return { dataBase64: bytesToBase64(bytes), length: bytes.length, eof: offset + bytes.length >= file.size };
+        });
+      }
+
       uploadInput.addEventListener("change", () => {
         const file = uploadInput.files && uploadInput.files[0];
         uploadInput.value = "";
@@ -1304,12 +2788,84 @@
       });
 
       // ---- 拖拽上传 ----
-      // 监听挂在 document 上：文件面板可见时，拖到工作台任意位置都能上传；
-      // 面板隐藏时仅阻止默认行为，避免误把文件拖入导致 iframe 被文件内容导航。
-      // 注意：真实 DBX 客户端（Tauri）默认在窗口层拦截原生文件拖放，沙箱
-      // iframe 可能收不到 drop 事件，此时请使用「上传」按钮（系统文件选择器）。
+      // 桌面端：宿主拦截系统级文件拖放，沙箱 iframe 收不到 drop 事件，改走
+      // window.dbxPlugin.fileTransfer.onDrop（已打开的读句柄）+ onDragState 驱动遮罩。
+      // Web 宿主没有 fileTransfer 时回退到 document 上的 DOM 拖拽事件：
+      // 文件面板可见时拖到工作台任意位置都能上传；面板隐藏时仅阻止默认行为，
+      // 避免误把文件拖入导致 iframe 被文件内容导航。
 
       let dragDepth = 0;
+      // 桌面端接管后：上传走 fileTransfer.onDrop，遮罩走 onDragState，
+      // DOM 拖拽事件只保留 preventDefault（防止文件内容导航 iframe）。
+      let hostDragActive = false;
+      let hostOwnsOverlay = false;
+      let hostFileTransfer = null;
+
+      function setDropOverlay(active) {
+        if (active && !filePanel.hidden) {
+          filePanel.dataset.drophint = text.dropHint;
+          filePanel.classList.add("dragover");
+        } else {
+          dragDepth = 0;
+          filePanel.classList.remove("dragover");
+        }
+      }
+
+      function normalizeDroppedHandles(files) {
+        if (!files) return [];
+        if (Array.isArray(files)) return files;
+        if (Array.isArray(files.files)) return files.files;
+        if (files.handleId) return [files];
+        return Array.prototype.slice.call(files);
+      }
+
+      function releaseHandle(handleId) {
+        try {
+          Promise.resolve(hostFileTransfer.cancel(handleId)).catch(() => {});
+        } catch (_) { /* 句柄可能已被宿主关闭 */ }
+      }
+
+      async function uploadDroppedHandles(files) {
+        const handles = normalizeDroppedHandles(files);
+        if (!handles.length) {
+          fileStatusLine(text.dropNone, true);
+          return;
+        }
+        if (uploadBusy) {
+          fileStatusLine(text.uploadBusy, true);
+          handles.forEach((handle) => releaseHandle(handle.handleId));
+          return;
+        }
+        for (const handle of handles) {
+          try {
+            await uploadToRemote(handle.name, handle.size || 0, (offset, length) =>
+              hostFileTransfer.read(handle.handleId, offset, length));
+          } finally {
+            releaseHandle(handle.handleId);
+          }
+        }
+      }
+
+      // 桌面端系统拖放：宿主在窗口层拦截原生文件拖放，iframe 收不到 DOM drop，
+      // 由 fileTransfer 送达已打开的读句柄；Web 宿主没有该对象则保持 DOM 回退。
+      function setupHostDragUpload() {
+        const ft = window.dbxPlugin.fileTransfer;
+        if (!ft || typeof ft.onDrop !== "function") return;
+        hostDragActive = true;
+        hostFileTransfer = ft;
+        hostOwnsOverlay = typeof ft.onDragState === "function";
+        if (hostOwnsOverlay) {
+          ft.onDragState((active) => setDropOverlay(!!active));
+        }
+        ft.onDrop((files) => {
+          setDropOverlay(false);
+          if (filePanel.hidden) {
+            normalizeDroppedHandles(files).forEach((handle) => releaseHandle(handle.handleId));
+            return;
+          }
+          uploadDroppedHandles(files);
+        });
+      }
 
       async function uploadDroppedFiles(dataTransfer) {
         const files = [];
@@ -1341,7 +2897,7 @@
       }
 
       document.addEventListener("dragenter", (event) => {
-        if (filePanel.hidden) return;
+        if (filePanel.hidden || hostOwnsOverlay) return;
         event.preventDefault();
         dragDepth += 1;
         filePanel.dataset.drophint = text.dropHint;
@@ -1349,11 +2905,11 @@
       });
       document.addEventListener("dragover", (event) => {
         event.preventDefault();
-        if (filePanel.hidden) return;
+        if (filePanel.hidden || hostOwnsOverlay) return;
         if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
       });
       document.addEventListener("dragleave", (event) => {
-        if (filePanel.hidden) return;
+        if (filePanel.hidden || hostOwnsOverlay) return;
         event.preventDefault();
         dragDepth -= 1;
         if (dragDepth <= 0) {
@@ -1363,6 +2919,7 @@
       });
       document.addEventListener("drop", (event) => {
         event.preventDefault();
+        if (hostDragActive) return; // 桌面端由 fileTransfer.onDrop 处理
         if (filePanel.hidden) return;
         dragDepth = 0;
         filePanel.classList.remove("dragover");
@@ -1423,6 +2980,7 @@
       async function init() {
         await window.dbxPlugin.ready;
         text = (window.dbxPlugin.locale || "en").toLowerCase().startsWith("zh") ? copy.zh : copy.en;
+        setupHostDragUpload();
         const context = window.dbxPlugin.context || {};
         connectionId = context.connectionId || (context.connection && context.connection.id) || null;
         if (!connectionId) {
@@ -1478,9 +3036,8 @@
       });
 
       document.addEventListener("keydown", (event) => {
-        // PTY 模式下键盘全部交给 xterm（远端 shell 原生处理）
-        if (ptyMode) return;
-        // 模态框打开时优先处理：Esc / Ctrl+C 关闭弹框（视为取消操作）
+        // The confirmation/prompt modal sits above every Docker dialog, so it
+        // must receive Escape first instead of closing the details beneath it.
         if (!modal.hidden) {
           const isCtrlC = event.ctrlKey && !event.metaKey && !event.altKey && event.key.toLowerCase() === "c";
           if (event.key === "Escape" || isCtrlC) {
@@ -1489,6 +3046,31 @@
           }
           return;
         }
+        // Logs are stacked above the details dialog now; close the top-most
+        // dialog first so Escape never discards the details underneath it.
+        if (!dockerLogsModal.hidden) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeDockerLogs();
+          }
+          return;
+        }
+        if (!dockerContainerDetailsModal.hidden) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeDockerContainerDetails();
+          }
+          return;
+        }
+        if (!dockerImageDetailsModal.hidden) {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeDockerImageDetails();
+          }
+          return;
+        }
+        // PTY 模式下键盘全部交给 xterm（远端 shell 原生处理）
+        if (ptyMode) return;
         if (event.key === "Escape") {
           if (completions.open) hideCompletions();
           return;

@@ -144,22 +144,28 @@ func (p *plugin) connectSSH(values map[string]any, connectionID string, emitter 
 	if err != nil {
 		return nil, map[string]any{"success": false, "message": "SSH connect failed: " + err.Error()}, nil
 	}
-	home := fetchRemoteHome(client)
 	session := &shellSession{
 		id:        connectionID,
 		kind:      "ssh",
 		sid:       randomHex(8),
 		sshClient: client,
-		cwd:       home,
-		home:      home,
 	}
-	// Open the interactive PTY shell immediately: this is the "real SSH
-	// client" mode where keystrokes stream to the remote shell and output
-	// streams back live.
+	// Query home and open the PTY concurrently so connection/connect stays
+	// comfortably inside the host's 10-second request deadline.
+	homeCh := make(chan string, 1)
+	go func() {
+		homeCh <- fetchRemoteHome(client)
+	}()
 	if err := openPTYShell(session, emitter); err != nil {
 		_ = client.Close()
+		<-homeCh
 		return nil, map[string]any{"success": false, "message": "PTY shell failed: " + err.Error()}, nil
 	}
+	home := <-homeCh
+	session.mutex.Lock()
+	session.home = home
+	session.cwd = home
+	session.mutex.Unlock()
 	go keepaliveLoop(session)
 	return session, map[string]any{
 		"success": true,
@@ -170,14 +176,14 @@ func (p *plugin) connectSSH(values map[string]any, connectionID string, emitter 
 }
 
 func fetchRemoteHome(client *ssh.Client) string {
-	session, sessionErr := withTimeout(sshDialTimeout, func() (*ssh.Session, error) {
+	session, sessionErr := withTimeout(sshSessionOpenTimeout, func() (*ssh.Session, error) {
 		return client.NewSession()
 	})
 	if sessionErr != nil {
 		return "/"
 	}
 	defer session.Close()
-	out, outputErr := withTimeout(sshDialTimeout, func() ([]byte, error) {
+	out, outputErr := withTimeout(sshSessionOpenTimeout, func() ([]byte, error) {
 		return session.Output("pwd")
 	})
 	if outputErr != nil {
@@ -194,7 +200,7 @@ func fetchRemoteHome(client *ssh.Client) string {
 // prompt. The injected command echoes briefly and is followed by a clear, so
 // the terminal looks untouched. Unsupported remote shells are skipped.
 func injectOsc7Report(s *shellSession) {
-	session, sessionErr := withTimeout(sshOpTimeout, func() (*ssh.Session, error) {
+	session, sessionErr := withTimeout(sshSessionOpenTimeout, func() (*ssh.Session, error) {
 		return s.sshClient.NewSession()
 	})
 	if sessionErr != nil {
@@ -259,7 +265,7 @@ func openPTYShell(s *shellSession, emitter eventEmitter) error {
 	if s.sshClient == nil {
 		return errors.New("SSH client is closed")
 	}
-	session, sessionErr := withTimeout(sshOpTimeout, func() (*ssh.Session, error) {
+	session, sessionErr := withTimeout(sshSessionOpenTimeout, func() (*ssh.Session, error) {
 		return s.sshClient.NewSession()
 	})
 	if sessionErr != nil {
@@ -268,6 +274,7 @@ func openPTYShell(s *shellSession, emitter eventEmitter) error {
 	}
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,
+		ssh.ICRNL:         1,
 		ssh.TTY_OP_ISPEED: 115200,
 		ssh.TTY_OP_OSPEED: 115200,
 	}
@@ -415,7 +422,7 @@ func (s *shellSession) startSSHExec(command string, emitter *dbxpluginsdk.Emitte
 	if s.sshClient == nil {
 		return nil, errors.New("SSH client is closed")
 	}
-	session, newSessionErr := withTimeout(sshOpTimeout, func() (*ssh.Session, error) {
+	session, newSessionErr := withTimeout(sshSessionOpenTimeout, func() (*ssh.Session, error) {
 		return s.sshClient.NewSession()
 	})
 	if newSessionErr != nil {
@@ -486,7 +493,7 @@ func (s *shellSession) ensureRemoteData() {
 	if s.isDead() || s.sshClient == nil {
 		return
 	}
-	session, sessionErr := withTimeout(sshOpTimeout, func() (*ssh.Session, error) {
+	session, sessionErr := withTimeout(sshSessionOpenTimeout, func() (*ssh.Session, error) {
 		return s.sshClient.NewSession()
 	})
 	if sessionErr != nil {
